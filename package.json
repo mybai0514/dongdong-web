@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.8",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.4",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -19,6 +22,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
