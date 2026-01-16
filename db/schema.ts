@@ -33,8 +33,8 @@ export const teams = sqliteTable('teams', {
   contact_value: text('contact_value').notNull(), // 具体联系号码
   creator_id: integer('creator_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('open'), // open=开放, closed=已关闭, full=人满
-  member_count: integer('member_count').default(0), // 当前队伍人数
-  max_members: integer('max_members').default(5), // 最大人数
+  member_count: integer('member_count').notNull().default(1), // 当前队伍人数
+  max_members: integer('max_members').notNull().default(5), // 最大人数
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 })

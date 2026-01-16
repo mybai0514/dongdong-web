@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq, desc, or } from 'drizzle-orm'
-import { teams, users, feedback, sessions } from '../../db/schema'
+import { teams, users, feedback, sessions, teamMembers } from '../../db/schema'
 import bcrypt from 'bcryptjs'
 
 type Bindings = {
@@ -319,7 +319,7 @@ app.get('/api/teams/:id', async (c) => {
 // 创建新的组队（支持新字段）
 app.post('/api/teams', async (c) => {
   try {
-    // ✅ 添加更好的错误处理
+    // 错误处理
     let body
     try {
       body = await c.req.json()
@@ -412,6 +412,160 @@ app.delete('/api/teams/:id', async (c) => {
   } catch (error) {
     console.error('删除组队错误:', error)
     return c.json({ error: '删除组队失败' }, 500)
+  }
+})
+
+// ==================== 加入队伍 API ====================
+
+// 加入队伍
+app.post('/api/teams/:id/join', async (c) => {
+  try {
+    const teamId = c.req.param('id')
+    const authHeader = c.req.header('Authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: '未登录' }, 401)
+    }
+
+    const token = authHeader.substring(7)
+    const db = drizzle(c.env.DB)
+    
+    // 验证用户
+    const user = await validateToken(db, token)
+    if (!user) {
+      return c.json({ error: '登录已过期，请重新登录' }, 401)
+    }
+
+    // 获取队伍信息
+    const team = await db.select().from(teams).where(eq(teams.id, Number(teamId))).get()
+    if (!team) {
+      return c.json({ error: '队伍不存在' }, 404)
+    }
+
+    // 检查队伍状态
+    if (team.status !== 'open') {
+      return c.json({ error: '该队伍已关闭或满员' }, 400)
+    }
+
+    // 检查是否已经是队长
+    if (team.creator_id === user.id) {
+      return c.json({ error: '你已经是队长了' }, 400)
+    }
+
+    // 检查是否已加入
+    const existingMember = await db.select()
+      .from(teamMembers)
+      .where(
+        or(
+          eq(teamMembers.team_id, Number(teamId)),
+          eq(teamMembers.user_id, user.id)
+        )
+      )
+      .get()
+
+    if (existingMember && existingMember.team_id === Number(teamId) && existingMember.user_id === user.id) {
+      return c.json({ error: '你已经加入该队伍了' }, 400)
+    }
+
+    // 检查人数是否已满
+    if (team.member_count >= team.max_members) {
+      return c.json({ error: '队伍已满员' }, 400)
+    }
+
+    // 加入队伍
+    await db.insert(teamMembers).values({
+      team_id: Number(teamId),
+      user_id: user.id,
+      joined_at: new Date()
+    }).run()
+
+    // 更新队伍人数
+    await db.update(teams)
+      .set({
+        member_count: team.member_count + 1,
+        status: (team.member_count + 1) >= team.max_members ? 'full' : 'open',
+        updated_at: new Date()
+      })
+      .where(eq(teams.id, Number(teamId)))
+      .run()
+
+    console.log(`✅ 用户 ${user.id} 加入队伍 ${teamId}`)
+
+    return c.json({
+      success: true,
+      message: '加入成功',
+      contact: {
+        method: team.contact_method,
+        value: team.contact_value
+      }
+    })
+  } catch (error) {
+    console.error('加入队伍错误:', error)
+    return c.json({ error: '加入失败' }, 500)
+  }
+})
+
+// 检查用户是否已加入队伍
+app.get('/api/teams/:id/check-membership', async (c) => {
+  try {
+    const teamId = c.req.param('id')
+    const authHeader = c.req.header('Authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ isMember: false, isCreator: false })
+    }
+
+    const token = authHeader.substring(7)
+    const db = drizzle(c.env.DB)
+    
+    const user = await validateToken(db, token)
+    if (!user) {
+      return c.json({ isMember: false, isCreator: false })
+    }
+
+    // 检查是否是队长
+    const team = await db.select().from(teams).where(eq(teams.id, Number(teamId))).get()
+    // 添加类型守卫
+    if (!team) {
+      return c.json({ isMember: false, isCreator: false })
+    }
+    if (team?.creator_id === user.id) {
+      return c.json({
+        isMember: true,
+        isCreator: true,
+        contact: {
+          method: team.contact_method,
+          value: team.contact_value
+        }
+      })
+    }
+
+    // 检查是否是队员
+    const member = await db.select()
+      .from(teamMembers)
+      .where(
+        or(
+          eq(teamMembers.team_id, Number(teamId)),
+          eq(teamMembers.user_id, user.id)
+        )
+      )
+      .get()
+
+    if (member && member.team_id === Number(teamId) && member.user_id === user.id) {
+      return c.json({
+        isMember: true,
+        isCreator: false,
+        contact: {
+          method: team!.contact_method,
+          value: team!.contact_value
+        }
+      })
+    }
+
+    return c.json({ isMember: false, isCreator: false })
+  } catch (error) {
+    console.error('检查成员错误:', error)
+    return c.json({ isMember: false, isCreator: false })
   }
 })
 
