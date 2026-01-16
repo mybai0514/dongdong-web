@@ -8,7 +8,7 @@ export default function Home() {
     <div className="flex flex-col">
       {/* Hero Section */}
       <section className="py-20 md:py-32">
-        <div className="container">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center space-y-6 max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
               找到你的
@@ -35,7 +35,7 @@ export default function Home() {
 
       {/* Features Section */}
       <section className="py-16 bg-muted/40">
-        <div className="container">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-12">核心功能</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
@@ -85,7 +85,7 @@ export default function Home() {
 
       {/* CTA Section */}
       <section className="py-20">
-        <div className="container">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Card className="bg-linear-to-r from-primary/10 to-purple-600/10 border-none">
             <CardContent className="pt-12 pb-12">
               <div className="text-center space-y-6 max-w-2xl mx-auto">

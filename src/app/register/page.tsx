@@ -88,7 +88,7 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = (await response.json()) as LoginResponse;
+      const data: LoginResponse = await response.json();
 
       if (!response.ok) {
         setError(data.error || '注册失败');
@@ -119,7 +119,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="container flex items-center justify-center min-h-[calc(100vh-4rem)] py-10">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-center min-h-[calc(100vh-4rem)] py-10">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
