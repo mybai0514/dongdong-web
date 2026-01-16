@@ -569,6 +569,187 @@ app.get('/api/teams/:id/check-membership', async (c) => {
   }
 })
 
+// 退出队伍
+app.post('/api/teams/:id/leave', async (c) => {
+  try {
+    const teamId = c.req.param('id')
+    const authHeader = c.req.header('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: '未登录' }, 401)
+    }
+
+    const token = authHeader.substring(7)
+    const db = drizzle(c.env.DB)
+
+    // 验证用户
+    const user = await validateToken(db, token)
+    if (!user) {
+      return c.json({ error: '登录已过期，请重新登录' }, 401)
+    }
+
+    // 获取队伍信息
+    const team = await db.select().from(teams).where(eq(teams.id, Number(teamId))).get()
+    if (!team) {
+      return c.json({ error: '队伍不存在' }, 404)
+    }
+
+    // 队长不能退出自己的队伍
+    if (team.creator_id === user.id) {
+      return c.json({ error: '队长不能退出自己的队伍，请解散队伍' }, 400)
+    }
+
+    // 检查是否是队员
+    const member = await db.select()
+      .from(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.team_id, Number(teamId)),
+          eq(teamMembers.user_id, user.id)
+        )
+      )
+      .get()
+
+    if (!member) {
+      return c.json({ error: '你不是该队伍的成员' }, 400)
+    }
+
+    // 删除成员记录
+    await db.delete(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.team_id, Number(teamId)),
+          eq(teamMembers.user_id, user.id)
+        )
+      )
+      .run()
+
+    // 更新队伍人数
+    await db.update(teams)
+      .set({
+        member_count: team.member_count - 1,
+        status: 'open', // 有人退出后重新开放
+        updated_at: new Date()
+      })
+      .where(eq(teams.id, Number(teamId)))
+      .run()
+
+    console.log(`✅ 用户 ${user.id} 退出队伍 ${teamId}`)
+
+    return c.json({
+      success: true,
+      message: '已退出队伍'
+    })
+  } catch (error) {
+    console.error('退出队伍错误:', error)
+    return c.json({ error: '退出失败' }, 500)
+  }
+})
+
+// ==================== 个人中心 API ====================
+
+// 获取用户发起的队伍
+app.get('/api/users/:id/teams', async (c) => {
+  try {
+    const userId = c.req.param('id')
+    const db = drizzle(c.env.DB)
+
+    const userTeams = await db.select()
+      .from(teams)
+      .where(eq(teams.creator_id, Number(userId)))
+      .orderBy(desc(teams.created_at))
+      .all()
+
+    return c.json(userTeams)
+  } catch (error) {
+    console.error('获取用户队伍错误:', error)
+    return c.json({ error: '获取队伍失败' }, 500)
+  }
+})
+
+// 获取当前用户加入的队伍
+app.get('/api/users/me/joined-teams', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: '未登录' }, 401)
+    }
+
+    const token = authHeader.substring(7)
+    const db = drizzle(c.env.DB)
+
+    const user = await validateToken(db, token)
+    if (!user) {
+      return c.json({ error: '登录已过期' }, 401)
+    }
+
+    // 获取用户加入的队伍（不包括自己创建的）
+    const memberRecords = await db.select()
+      .from(teamMembers)
+      .where(eq(teamMembers.user_id, user.id))
+      .all()
+
+    if (memberRecords.length === 0) {
+      return c.json([])
+    }
+
+    // 获取队伍详情
+    const teamIds = memberRecords.map(m => m.team_id)
+    const joinedTeams = await db.select()
+      .from(teams)
+      .where(or(...teamIds.map(id => eq(teams.id, id))))
+      .orderBy(desc(teams.created_at))
+      .all()
+
+    return c.json(joinedTeams)
+  } catch (error) {
+    console.error('获取加入的队伍错误:', error)
+    return c.json({ error: '获取队伍失败' }, 500)
+  }
+})
+
+// 更新用户信息
+app.put('/api/users/:id', async (c) => {
+  try {
+    const userId = c.req.param('id')
+    const authHeader = c.req.header('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: '未登录' }, 401)
+    }
+
+    const token = authHeader.substring(7)
+    const db = drizzle(c.env.DB)
+
+    const user = await validateToken(db, token)
+    if (!user) {
+      return c.json({ error: '登录已过期' }, 401)
+    }
+
+    // 只能更新自己的信息
+    if (user.id !== Number(userId)) {
+      return c.json({ error: '无权限修改他人信息' }, 403)
+    }
+
+    const { wechat, qq, yy } = await c.req.json()
+
+    await db.update(users)
+      .set({
+        wechat: wechat || null,
+        qq: qq || null,
+        yy: yy || null
+      })
+      .where(eq(users.id, Number(userId)))
+      .run()
+
+    return c.json({ success: true, message: '更新成功' })
+  } catch (error) {
+    console.error('更新用户信息错误:', error)
+    return c.json({ error: '更新失败' }, 500)
+  }
+})
+
 // ==================== 反馈相关 API ====================
 
 // 提交月度反馈（支持新字段）
