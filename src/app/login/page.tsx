@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +36,8 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect') || '/' // 获取重定向参数
 
   const [formData, setFormData] = useState({
     email: '',
@@ -64,7 +66,7 @@ export default function LoginPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = (await response.json()) as LoginResponse;
+      const data: LoginResponse = await response.json();
 
       if (!response.ok) {
         setError(data.error || '登录失败');
@@ -78,14 +80,12 @@ export default function LoginPage() {
 
         // 触发自定义事件，通知导航栏更新
         window.dispatchEvent(new Event('user-login'));
-
-        router.push('/');
+        
+        // 跳转到重定向页面或首页
+        router.push(redirect)
       } else {
         setError('登录响应数据不完整');
       }
-
-      // 跳转到首页
-      router.push('/');
     } catch (err) {
       setError('网络错误，请稍后重试');
       console.error('登录错误:', err);
@@ -95,7 +95,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="container flex items-center justify-center min-h-[calc(100vh-4rem)] py-10">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-center min-h-[calc(100vh-4rem)] py-10">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
