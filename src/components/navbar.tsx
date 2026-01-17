@@ -12,11 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { User as UserType } from '@/types'
 
 export function Navbar() {
   const router = useRouter()
   const pathname = usePathname() // 监听路由变化
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<UserType | null>(null)
 
   // 刷新用户信息的函数
   const refreshUser = () => {

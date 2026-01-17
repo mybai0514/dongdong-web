@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { 
-  Users, 
-  Clock, 
-  MessageCircle, 
-  Search, 
+import {
+  Users,
+  Clock,
+  MessageCircle,
+  Search,
   Filter,
   Plus,
   Gamepad2,
@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import type { User, Team, MembershipStatus, ContactMethod } from '@/types'
 
 // 游戏列表
 const GAMES = [
@@ -53,30 +54,9 @@ const RANKS = {
   '默认': ['新手', '进阶', '高手', '大神']
 }
 
-interface Team {
-  id: number
-  game: string
-  title: string
-  description: string
-  rank_requirement?: string
-  contact_method: string
-  contact_value: string
-  creator_id: number
-  status: 'open' | 'closed' | 'full'
-  member_count: number
-  max_members: number
-  created_at: string
-}
-
 interface ContactInfo {
-  method: string
+  method: ContactMethod
   value: string
-}
-
-interface MembershipStatus {
-  isMember: boolean
-  isCreator: boolean
-  contact?: ContactInfo
 }
 
 export default function TeamsPage() {
@@ -84,7 +64,7 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedGame, setSelectedGame] = useState('全部')
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   // 加入队伍相关状态
   const [joiningTeamId, setJoiningTeamId] = useState<number | null>(null)
@@ -285,7 +265,7 @@ export default function TeamsPage() {
         </div>
 
         <Select value={selectedGame} onValueChange={setSelectedGame}>
-          <SelectTrigger className="w-full md:w-[200px]">
+          <SelectTrigger className="w-full md:w-50">
             <Filter className="mr-2 h-4 w-4" />
             <SelectValue placeholder="选择游戏" />
           </SelectTrigger>
@@ -392,8 +372,8 @@ export default function TeamsPage() {
 }
 
 // 拆分出卡片组件
-function TeamCard({ 
-  team, 
+function TeamCard({
+  team,
   user,
   joiningTeamId,
   onJoin,
@@ -403,7 +383,7 @@ function TeamCard({
   formatTime
 }: {
   team: Team
-  user: any
+  user: User | null
   joiningTeamId: number | null
   onJoin: (id: number) => void
   onShowContact: (id: number) => void
@@ -485,7 +465,7 @@ function TeamCard({
 
           <div className="flex items-center text-muted-foreground">
             <Clock className="h-4 w-4 mr-2 shrink-0" />
-            <span>{formatTime(team.created_at)}</span>
+            <span>{team.created_at ? formatTime(team.created_at) : '未知时间'}</span>
           </div>
         </div>
 
