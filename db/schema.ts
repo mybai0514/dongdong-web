@@ -2,24 +2,24 @@ import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 
 // ==================== 用户表 ====================
 export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  username: text('username').notNull().unique(),
-  email: text('email').notNull().unique(),
-  password_hash: text('password_hash').notNull(),
+  id: integer('id').primaryKey({ autoIncrement: true }), // 用户 ID
+  username: text('username').notNull().unique(), // 用户名
+  email: text('email').notNull().unique(), // 邮箱
+  password_hash: text('password_hash').notNull(), // 密码哈希
   avatar: text('avatar'), // 头像 URL
   wechat: text('wechat'), // 微信号
   qq: text('qq'), // QQ 号
   yy: text('yy'), // YY 号
-  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()) // 创建时间
 })
 
 // ==================== 会话表 ====================
 export const sessions = sqliteTable('sessions', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  id: integer('id').primaryKey({ autoIncrement: true }), // 会话 ID
+  user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // 用户 ID
   token: text('token').notNull().unique(), // 会话令牌
   expires_at: integer('expires_at', { mode: 'timestamp' }).notNull(), // 过期时间
-  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()) // 创建时间
 })
 
 // ==================== 组队表 ====================
@@ -35,8 +35,8 @@ export const teams = sqliteTable('teams', {
   status: text('status').notNull().default('open'), // open=开放, closed=已关闭, full=人满
   member_count: integer('member_count').notNull().default(1), // 当前队伍人数
   max_members: integer('max_members').notNull().default(5), // 最大人数
-  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()), // 创建时间
+  updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()) // 更新时间
 })
 
 // ==================== 月度反馈表 ====================
