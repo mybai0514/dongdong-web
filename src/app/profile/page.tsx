@@ -32,35 +32,21 @@ import {
   Loader2,
   LogOut
 } from 'lucide-react'
-
-interface UserInfo {
-  id: number
-  username: string
-  email: string
-  avatar?: string
-  wechat?: string
-  qq?: string
-  yy?: string
-}
-
-interface Team {
-  id: number
-  game: string
-  title: string
-  description?: string
-  rank_requirement?: string
-  contact_method: string
-  contact_value: string
-  creator_id: number
-  status: 'open' | 'closed' | 'full'
-  member_count: number
-  max_members: number
-  created_at: string
-}
+import {
+  getUserTeams,
+  getJoinedTeams,
+  updateUser,
+  leaveTeam,
+  logout,
+  getStoredUser,
+  setStoredUser,
+  ApiError
+} from '@/lib/api'
+import type { User as UserType, Team } from '@/types'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserInfo | null>(null)
+  const [user, setUser] = useState<UserType | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -88,15 +74,13 @@ export default function ProfilePage() {
 
   // 检查登录状态并获取用户信息
   useEffect(() => {
-    const userStr = localStorage.getItem('user')
-    const token = localStorage.getItem('token')
+    const userData = getStoredUser<UserType>()
 
-    if (!userStr || !token) {
+    if (!userData) {
       router.push('/login?redirect=/profile')
       return
     }
 
-    const userData = JSON.parse(userStr)
     setUser(userData)
     setEditForm({
       wechat: userData.wechat || '',
@@ -106,23 +90,16 @@ export default function ProfilePage() {
     setLoading(false)
 
     // 获取我发起的队伍和加入的队伍
-    fetchMyTeams(userData.id, token)
-    fetchJoinedTeams(token)
+    fetchMyTeams(userData.id)
+    fetchJoinedTeamsList()
   }, [router])
 
   // 获取我发起的队伍
-  const fetchMyTeams = async (userId: number, token: string) => {
+  const fetchMyTeams = async (userId: number) => {
     setLoadingMyTeams(true)
     try {
-      const response = await fetch(`http://localhost:8787/api/users/${userId}/teams`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (Array.isArray(data)) {
-        setMyTeams(data)
-      }
+      const data = await getUserTeams(userId)
+      setMyTeams(data)
     } catch (error) {
       console.error('获取我的队伍失败:', error)
     } finally {
@@ -131,18 +108,11 @@ export default function ProfilePage() {
   }
 
   // 获取我加入的队伍
-  const fetchJoinedTeams = async (token: string) => {
+  const fetchJoinedTeamsList = async () => {
     setLoadingJoinedTeams(true)
     try {
-      const response = await fetch('http://localhost:8787/api/users/me/joined-teams', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (Array.isArray(data)) {
-        setJoinedTeams(data)
-      }
+      const data = await getJoinedTeams()
+      setJoinedTeams(data)
     } catch (error) {
       console.error('获取加入的队伍失败:', error)
     } finally {
@@ -156,27 +126,14 @@ export default function ProfilePage() {
 
     setSaving(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/users/${user.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(editForm)
-      })
-
-      if (response.ok) {
-        const updatedUser = { ...user, ...editForm }
-        setUser(updatedUser)
-        localStorage.setItem('user', JSON.stringify(updatedUser))
-        setEditing(false)
-      } else {
-        alert('保存失败，请稍后重试')
-      }
+      await updateUser(user.id, editForm)
+      const updatedUser = { ...user, ...editForm }
+      setUser(updatedUser)
+      setStoredUser(updatedUser)
+      setEditing(false)
     } catch (error) {
       console.error('保存联系方式错误:', error)
-      alert('网络错误，请稍后重试')
+      alert('保存失败，请稍后重试')
     } finally {
       setSaving(false)
     }
@@ -188,25 +145,17 @@ export default function ProfilePage() {
 
     setLeaving(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${leaveDialog.teamId}/leave`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (response.ok) {
-        // 刷新加入的队伍列表
-        fetchJoinedTeams(token!)
-        setLeaveDialog({ open: false })
+      await leaveTeam(leaveDialog.teamId)
+      // 刷新加入的队伍列表
+      fetchJoinedTeamsList()
+      setLeaveDialog({ open: false })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message || '退出失败')
       } else {
-        const data: { error?: string } = await response.json()
-        alert(data.error || '退出失败')
+        alert('网络错误，请稍后重试')
       }
-    } catch (error) {
-      console.error('退出队伍错误:', error)
-      alert('网络错误，请稍后重试')
+      console.error('退出队伍错误:', err)
     } finally {
       setLeaving(false)
     }
@@ -215,18 +164,10 @@ export default function ProfilePage() {
   // 登出
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('token')
-      await fetch('http://localhost:8787/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      await logout()
     } catch (error) {
       console.error('登出错误:', error)
     } finally {
-      localStorage.removeItem('user')
-      localStorage.removeItem('token')
       router.push('/login')
     }
   }
@@ -473,7 +414,7 @@ export default function ProfilePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {formatTime(team.created_at)}
+                            {team.created_at ? formatTime(team.created_at) : '未知时间'}
                           </span>
                         </div>
                       </div>
@@ -534,7 +475,7 @@ export default function ProfilePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {formatTime(team.created_at)}
+                            {team.created_at ? formatTime(team.created_at) : '未知时间'}
                           </span>
                         </div>
                       </div>

@@ -36,6 +36,16 @@ import {
   AlertTriangle,
   Settings
 } from 'lucide-react'
+import {
+  getTeam,
+  getTeamMembers,
+  updateTeam,
+  deleteTeam,
+  kickMember,
+  getStoredUser,
+  ApiError
+} from '@/lib/api'
+import type { User, Team, TeamMember, ContactMethod } from '@/types'
 
 // 游戏列表
 const GAMES = [
@@ -68,36 +78,14 @@ const CONTACT_METHODS = [
   { value: 'yy', label: 'YY' }
 ]
 
-interface Team {
-  id: number
-  game: string
-  title: string
-  description?: string
-  rank_requirement?: string
-  contact_method: string
-  contact_value: string
-  creator_id: number
-  status: 'open' | 'closed' | 'full'
-  member_count: number
-  max_members: number
-  created_at: string
-}
-
-interface Member {
-  id: number
-  user_id: number
-  username: string
-  joined_at: string
-}
-
 export default function ManageTeamPage() {
   const router = useRouter()
   const params = useParams()
-  const teamId = params.id as string
+  const teamId = Number(params.id)
 
-  const [user, setUser] = useState<{ id: number } | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [team, setTeam] = useState<Team | null>(null)
-  const [members, setMembers] = useState<Member[]>([])
+  const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -106,7 +94,7 @@ export default function ManageTeamPage() {
     title: string
     description: string
     rank_requirement: string
-    contact_method: string
+    contact_method: ContactMethod
     contact_value: string
     max_members: number
     status: 'open' | 'closed' | 'full'
@@ -127,53 +115,35 @@ export default function ManageTeamPage() {
   // 踢出成员弹窗
   const [kickDialog, setKickDialog] = useState<{
     open: boolean
-    member?: Member
+    member?: TeamMember
   }>({ open: false })
   const [kicking, setKicking] = useState(false)
 
   // 检查登录状态并获取队伍信息
   useEffect(() => {
-    const userStr = localStorage.getItem('user')
-    const token = localStorage.getItem('token')
+    const userData = getStoredUser<User>()
 
-    if (!userStr || !token) {
+    if (!userData) {
       router.push(`/login?redirect=/teams/${teamId}/manage`)
       return
     }
 
-    const userData = JSON.parse(userStr)
     setUser(userData)
-
-    fetchTeamData(token)
-    fetchMembers(token)
+    fetchTeamData()
+    fetchMembersList()
   }, [router, teamId])
 
   // 获取队伍信息
-  const fetchTeamData = async (token: string) => {
+  const fetchTeamData = async () => {
     try {
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        setError('队伍不存在')
-        setLoading(false)
-        return
-      }
-
-      const data: Team = await response.json()
+      const data = await getTeam(teamId)
       setTeam(data)
 
       // 检查是否是队长
-      const userStr = localStorage.getItem('user')
-      if (userStr) {
-        const userData = JSON.parse(userStr)
-        if (data.creator_id !== userData.id) {
-          router.push('/teams')
-          return
-        }
+      const userData = getStoredUser<User>()
+      if (userData && data.creator_id !== userData.id) {
+        router.push('/teams')
+        return
       }
 
       setFormData({
@@ -187,27 +157,17 @@ export default function ManageTeamPage() {
       })
     } catch (err) {
       console.error('获取队伍信息错误:', err)
-      setError('获取队伍信息失败')
+      setError('队伍不存在或获取失败')
     } finally {
       setLoading(false)
     }
   }
 
   // 获取队伍成员
-  const fetchMembers = async (token: string) => {
+  const fetchMembersList = async () => {
     try {
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}/members`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (Array.isArray(data)) {
-          setMembers(data)
-        }
-      }
+      const data = await getTeamMembers(teamId)
+      setMembers(data)
     } catch (err) {
       console.error('获取成员列表错误:', err)
     }
@@ -229,31 +189,19 @@ export default function ManageTeamPage() {
     setError('')
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-
-      const data: { success?: boolean; error?: string } = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || '保存失败')
-        return
-      }
-
+      await updateTeam(teamId, formData)
       // 更新本地状态
       if (team) {
         setTeam({ ...team, ...formData })
       }
       alert('保存成功')
     } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || '保存失败')
+      } else {
+        setError('网络错误，请稍后重试')
+      }
       console.error('保存队伍信息错误:', err)
-      setError('网络错误，请稍后重试')
     } finally {
       setSaving(false)
     }
@@ -264,23 +212,15 @@ export default function ManageTeamPage() {
     setDisbanding(true)
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (response.ok) {
-        router.push('/profile')
-      } else {
-        const data: { error?: string } = await response.json()
-        alert(data.error || '解散失败')
-      }
+      await deleteTeam(teamId)
+      router.push('/profile')
     } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message || '解散失败')
+      } else {
+        alert('网络错误，请稍后重试')
+      }
       console.error('解散队伍错误:', err)
-      alert('网络错误，请稍后重试')
     } finally {
       setDisbanding(false)
       setDisbandDialog(false)
@@ -294,36 +234,29 @@ export default function ManageTeamPage() {
     setKicking(true)
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}/members/${kickDialog.member.user_id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (response.ok) {
-        // 刷新成员列表
-        fetchMembers(token!)
-        // 更新队伍人数
-        if (team) {
-          setTeam({ ...team, member_count: team.member_count - 1 })
-        }
-        setKickDialog({ open: false })
-      } else {
-        const data: { error?: string } = await response.json()
-        alert(data.error || '踢出失败')
+      await kickMember(teamId, kickDialog.member.user_id)
+      // 刷新成员列表
+      fetchMembersList()
+      // 更新队伍人数
+      if (team) {
+        setTeam({ ...team, member_count: team.member_count - 1 })
       }
+      setKickDialog({ open: false })
     } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message || '踢出失败')
+      } else {
+        alert('网络错误，请稍后重试')
+      }
       console.error('踢出成员错误:', err)
-      alert('网络错误，请稍后重试')
     } finally {
       setKicking(false)
     }
   }
 
   // 格式化时间
-  const formatTime = (dateString: string) => {
+  const formatTime = (dateString: string | null) => {
+    if (!dateString) return '未知时间'
     const date = new Date(dateString)
     return date.toLocaleDateString('zh-CN', {
       year: 'numeric',
@@ -499,7 +432,7 @@ export default function ManageTeamPage() {
                     <Label htmlFor="contact_method">联系方式类型 *</Label>
                     <Select
                       value={formData.contact_method}
-                      onValueChange={(value) => setFormData({ ...formData, contact_method: value })}
+                      onValueChange={(value) => setFormData({ ...formData, contact_method: value as ContactMethod })}
                     >
                       <SelectTrigger id="contact_method">
                         <SelectValue />

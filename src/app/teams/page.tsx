@@ -33,6 +33,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import type { User, Team, MembershipStatus, ContactMethod } from '@/types'
+import { getTeams, joinTeam, checkMembership, ApiError, getStoredUser } from '@/lib/api'
 
 // 游戏列表
 const GAMES = [
@@ -46,13 +47,6 @@ const GAMES = [
   '永劫无间',
   '其他'
 ]
-
-// 段位列表
-const RANKS = {
-  '王者荣耀': ['青铜', '白银', '黄金', '铂金', '钻石', '星耀', '最强王者', '荣耀王者'],
-  '和平精英': ['青铜', '白银', '黄金', '铂金', '钻石', '皇冠', '王牌', '无敌战神'],
-  '默认': ['新手', '进阶', '高手', '大神']
-}
 
 interface ContactInfo {
   method: ContactMethod
@@ -75,32 +69,25 @@ export default function TeamsPage() {
 
   // 检查用户登录状态
   useEffect(() => {
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      setUser(JSON.parse(userStr))
+    const userData = getStoredUser<User>()
+    if (userData) {
+      setUser(userData)
     }
   }, [])
 
   // 获取组队列表
   useEffect(() => {
-    fetchTeams()
+    fetchTeamsList()
   }, [selectedGame])
 
-  const fetchTeams = async () => {
+  const fetchTeamsList = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (selectedGame !== '全部') {
-        params.append('game', selectedGame)
-      }
-      params.append('status', 'open')
-
-      const response = await fetch(`http://localhost:8787/api/teams?${params}`)
-      const data = await response.json()
-      
-      if (Array.isArray(data)) {
-        setTeams(data)
-      }
+      const data = await getTeams({
+        game: selectedGame,
+        status: 'open'
+      })
+      setTeams(data)
     } catch (error) {
       console.error('获取组队列表失败:', error)
     } finally {
@@ -118,20 +105,7 @@ export default function TeamsPage() {
     setJoiningTeamId(teamId)
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}/join`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data: { error?: string; contact?: ContactInfo } = await response.json()
-
-      if (!response.ok) {
-        alert(data.error || '加入失败')
-        return
-      }
+      const data = await joinTeam(teamId)
 
       // 显示联系方式
       setContactDialog({
@@ -140,29 +114,27 @@ export default function TeamsPage() {
       })
 
       // 刷新列表
-      fetchTeams()
-    } catch (error) {
-      console.error('加入队伍错误:', error)
-      alert('网络错误，请稍后重试')
+      fetchTeamsList()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message || '加入失败')
+      } else {
+        alert('网络错误，请稍后重试')
+      }
+      console.error('加入队伍错误:', err)
     } finally {
       setJoiningTeamId(null)
     }
   }
 
 // 检查成员状态
-  const checkMembership = async (teamId: number): Promise<MembershipStatus> => {
+  const checkMembershipStatus = async (teamId: number): Promise<MembershipStatus> => {
     if (!user) {
       return { isMember: false, isCreator: false }
     }
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${teamId}/check-membership`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      return await response.json()
+      return await checkMembership(teamId)
     } catch (error) {
       return { isMember: false, isCreator: false }
     }
@@ -170,8 +142,8 @@ export default function TeamsPage() {
 
   // 显示联系方式（仅对队员和队长）
   const showContact = async (teamId: number) => {
-    const status = await checkMembership(teamId)
-    
+    const status = await checkMembershipStatus(teamId)
+
     if (!status.isMember) {
       alert('请先加入队伍才能查看联系方式')
       return
@@ -401,13 +373,7 @@ function TeamCard({
 
   const checkStatus = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8787/api/teams/${team.id}/check-membership`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data: MembershipStatus = await response.json()
+      const data = await checkMembership(team.id)
       setMemberStatus(data)
     } catch (error) {
       console.error('检查成员状态错误:', error)

@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowLeft, Loader2, Plus } from 'lucide-react'
+import { createTeam, ApiError, getStoredUser } from '@/lib/api'
+import type { User, ContactMethod } from '@/types'
 
 // 游戏列表
 const GAMES = [
@@ -48,21 +50,21 @@ const CONTACT_METHODS = [
   { value: 'yy', label: 'YY' }
 ]
 
-// 添加响应类型定义
-interface CreateTeamResponse {
-  success?: boolean
-  teamId?: number
-  message?: string
-  error?: string
-}
-
 export default function CreateTeamPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    game: string
+    title: string
+    description: string
+    rank_requirement: string
+    contact_method: ContactMethod
+    contact_value: string
+    max_members: number
+  }>({
     game: '',
     title: '',
     description: '',
@@ -74,12 +76,11 @@ export default function CreateTeamPage() {
 
   // 检查登录状态
   useEffect(() => {
-    const userStr = localStorage.getItem('user')
-    if (!userStr) {
+    const userData = getStoredUser<User>()
+    if (!userData) {
       router.push('/login?redirect=/teams/create')
       return
     }
-    const userData = JSON.parse(userStr)
     setUser(userData)
 
     // 自动填充用户的联系方式
@@ -87,19 +88,19 @@ export default function CreateTeamPage() {
       setFormData(prev => ({
         ...prev,
         contact_method: 'wechat',
-        contact_value: userData.wechat
+        contact_value: userData.wechat || ''
       }))
     } else if (userData.qq) {
       setFormData(prev => ({
         ...prev,
         contact_method: 'qq',
-        contact_value: userData.qq
+        contact_value: userData.qq || ''
       }))
     } else if (userData.yy) {
       setFormData(prev => ({
         ...prev,
         contact_method: 'yy',
-        contact_value: userData.yy
+        contact_value: userData.yy || ''
       }))
     }
   }, [router])
@@ -133,33 +134,25 @@ export default function CreateTeamPage() {
       return
     }
 
+    if (!user) {
+      setError('请先登录')
+      return
+    }
+
     setLoading(true)
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8787/api/teams', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          creator_id: user.id
-        }),
+      await createTeam({
+        ...formData,
+        creator_id: user.id
       })
-
-      const data: CreateTeamResponse = await response.json() 
-
-      if (!response.ok) {
-        setError(data.error || '发布失败')
-        return
-      }
-
-      // 跳转到组队列表
       router.push('/teams')
     } catch (err) {
-      setError('网络错误，请稍后重试')
+      if (err instanceof ApiError) {
+        setError(err.message || '发布失败')
+      } else {
+        setError('网络错误，请稍后重试')
+      }
       console.error('发布组队错误:', err)
     } finally {
       setLoading(false)
@@ -292,9 +285,9 @@ export default function CreateTeamPage() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="contact_method">联系方式类型 *</Label>
-                  <Select 
-                    value={formData.contact_method} 
-                    onValueChange={(value) => setFormData({ ...formData, contact_method: value })}
+                  <Select
+                    value={formData.contact_method}
+                    onValueChange={(value) => setFormData({ ...formData, contact_method: value as ContactMethod })}
                   >
                     <SelectTrigger id="contact_method">
                       <SelectValue />

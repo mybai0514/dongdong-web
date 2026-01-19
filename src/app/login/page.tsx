@@ -14,30 +14,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GamepadIcon, Loader2 } from 'lucide-react';
-
-// 类型定义
-interface LoginResponse {
-  success?: boolean;
-  message?: string;
-  error?: string;
-  token?: string;
-  user?: {
-    id: number;
-    username: string;
-    email: string;
-    avatar?: string;
-    wechat?: string;
-    qq?: string;
-    yy?: string;
-  };
-}
+import { login, ApiError } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/' // 获取重定向参数
+  const redirect = searchParams.get('redirect') || '/'
 
   const [formData, setFormData] = useState({
     email: '',
@@ -58,36 +42,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8787/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data: LoginResponse = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || '登录失败');
-        return;
-      }
-
-      if (data.token && data.user) {
-        // 保存 token 和用户信息
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
-        // 触发自定义事件，通知导航栏更新
-        window.dispatchEvent(new Event('user-login'));
-        
-        // 跳转到重定向页面或首页
-        router.push(redirect)
-      } else {
-        setError('登录响应数据不完整');
-      }
+      await login(formData);
+      router.push(redirect);
     } catch (err) {
-      setError('网络错误，请稍后重试');
+      if (err instanceof ApiError) {
+        setError(err.message || '登录失败');
+      } else {
+        setError('网络错误，请稍后重试');
+      }
       console.error('登录错误:', err);
     } finally {
       setLoading(false);

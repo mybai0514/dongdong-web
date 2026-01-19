@@ -14,23 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GamepadIcon, Loader2 } from 'lucide-react';
-
-// 类型定义
-interface LoginResponse {
-  success?: boolean;
-  message?: string;
-  error?: string;
-  token?: string;
-  user?: {
-    id: number;
-    username: string;
-    email: string;
-    avatar?: string;
-    wechat?: string;
-    qq?: string;
-    yy?: string;
-  };
-}
+import { register, ApiError } from '@/lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -73,45 +57,21 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8787/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          wechat: formData.wechat,
-          qq: formData.qq,
-          yy: formData.yy,
-        }),
+      await register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        wechat: formData.wechat,
+        qq: formData.qq,
+        yy: formData.yy,
       });
-
-      const data: LoginResponse = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || '注册失败');
-        return;
-      }
-
-      if (data.token && data.user) {
-        // 保存 token 和用户信息到 localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
-        // 触发自定义事件，通知导航栏更新
-        window.dispatchEvent(new Event('user-login'));
-
-        router.push('/');
-      } else {
-        setError('登录响应数据不完整');
-      }
-
-      // 跳转到首页
       router.push('/');
     } catch (err) {
-      setError('网络错误，请稍后重试');
+      if (err instanceof ApiError) {
+        setError(err.message || '注册失败');
+      } else {
+        setError('网络错误，请稍后重试');
+      }
       console.error('注册错误:', err);
     } finally {
       setLoading(false);
