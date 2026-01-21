@@ -33,7 +33,8 @@ export const RANKS: Record<string, string[]> = {
 export const CONTACT_METHODS = [
   { value: 'wechat', label: '微信' },
   { value: 'qq', label: 'QQ' },
-  { value: 'yy', label: 'YY' }
+  { value: 'yy', label: 'YY' },
+  { value: 'other', label: '其他' }
 ] as const
 
 // 获取游戏对应的段位列表

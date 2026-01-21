@@ -6,7 +6,7 @@
 export type TeamStatus = 'open' | 'closed' | 'full'
 
 // 联系方式类型
-export type ContactMethod = 'wechat' | 'qq' | 'yy'
+export type ContactMethod = 'wechat' | 'qq' | 'yy' | 'other'
 
 // 队伍信息
 export interface Team {

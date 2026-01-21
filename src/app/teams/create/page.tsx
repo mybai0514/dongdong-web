@@ -308,11 +308,11 @@ export default function CreateTeamPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="contact_value">
-                    {CONTACT_METHODS.find(m => m.value === formData.contact_method)?.label} 号 *
+                    {CONTACT_METHODS.find(m => m.value === formData.contact_method)?.label} *
                   </Label>
                   <Input
                     id="contact_value"
-                    placeholder={`请输入你的${CONTACT_METHODS.find(m => m.value === formData.contact_method)?.label}号`}
+                    placeholder={`请输入你的${CONTACT_METHODS.find(m => m.value === formData.contact_method)?.label}`}
                     value={formData.contact_value}
                     onChange={(e) => setFormData({ ...formData, contact_value: e.target.value })}
                     required

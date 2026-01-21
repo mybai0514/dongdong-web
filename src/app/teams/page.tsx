@@ -177,6 +177,8 @@ export default function TeamsPage() {
         return 'QQ'
       case 'yy':
         return 'YY'
+      case 'other':
+        return '其他'
       default:
         return '联系方式'
     }
