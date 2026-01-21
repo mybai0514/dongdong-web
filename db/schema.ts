@@ -57,3 +57,15 @@ export const teamMembers = sqliteTable('team_members', {
   user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   joined_at: integer('joined_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 })
+
+// ==================== 评价表 ====================
+export const reviews = sqliteTable('reviews', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  reviewer_id: integer('reviewer_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // 评价者
+  reviewee_id: integer('reviewee_id').notNull().references(() => users.id, { onDelete: 'cascade' }), // 被评价者
+  team_id: integer('team_id').references(() => teams.id, { onDelete: 'set null' }), // 关联队伍（可选）
+  rating: integer('rating').notNull(), // 评分 1-5
+  comment: text('comment'), // 评价内容
+  tags: text('tags'), // 标签（JSON 数组字符串）：技术好/配合默契/准时等
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+})
