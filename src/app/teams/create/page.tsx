@@ -236,6 +236,7 @@ export default function CreateTeamPage() {
                   <DateTimePicker
                     date={formData.start_time}
                     setDate={(date) => setFormData({ ...formData, start_time: date })}
+                    minDate={new Date()}
                   />
                 </div>
                 <div className="space-y-2">
@@ -243,6 +244,8 @@ export default function CreateTeamPage() {
                   <DateTimePicker
                     date={formData.end_time}
                     setDate={(date) => setFormData({ ...formData, end_time: date })}
+                    minDate={formData.start_time}
+                    disabled={!formData.start_time}
                   />
                 </div>
               </div>

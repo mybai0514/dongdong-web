@@ -17,11 +17,14 @@ import { Input } from "@/components/ui/input"
 interface DateTimePickerProps {
   date?: Date
   setDate: (date: Date | undefined) => void
+  minDate?: Date
+  disabled?: boolean
 }
 
-export function DateTimePicker({ date, setDate }: DateTimePickerProps) {
+export function DateTimePicker({ date, setDate, minDate, disabled }: DateTimePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [tempDate, setTempDate] = React.useState<Date | undefined>(date)
+  const [error, setError] = React.useState<string>("")
 
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (selectedDate) {
@@ -31,6 +34,7 @@ export function DateTimePicker({ date, setDate }: DateTimePickerProps) {
         newDateTime.setMinutes(tempDate.getMinutes())
       }
       setTempDate(newDateTime)
+      setError("")
     }
   }
 
@@ -42,17 +46,24 @@ export function DateTimePicker({ date, setDate }: DateTimePickerProps) {
       newDateTime.setHours(parseInt(hours))
       newDateTime.setMinutes(parseInt(minutes))
       setTempDate(newDateTime)
+      setError("")
     }
   }
 
   const handleConfirm = () => {
+    if (minDate && tempDate && tempDate < minDate) {
+      setError("选择的时间不能早于最小时间")
+      return
+    }
     setDate(tempDate)
     setOpen(false)
+    setError("")
   }
 
   const handleCancel = () => {
     setTempDate(date)
     setOpen(false)
+    setError("")
   }
 
   return (
@@ -64,6 +75,7 @@ export function DateTimePicker({ date, setDate }: DateTimePickerProps) {
             "w-full justify-start text-left font-normal",
             !date && "text-muted-foreground"
           )}
+          disabled={disabled}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? format(date, "PPP HH:mm", { locale: zhCN }) : <span>选择日期时间</span>}
@@ -75,6 +87,16 @@ export function DateTimePicker({ date, setDate }: DateTimePickerProps) {
           selected={tempDate}
           onSelect={handleDateSelect}
           locale={zhCN}
+          disabled={(date) => {
+            if (!minDate) return false
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const checkDate = new Date(date)
+            checkDate.setHours(0, 0, 0, 0)
+            const minDateOnly = new Date(minDate)
+            minDateOnly.setHours(0, 0, 0, 0)
+            return checkDate < minDateOnly
+          }}
         />
         <div className="p-3 border-t space-y-3">
           <Input
@@ -82,6 +104,9 @@ export function DateTimePicker({ date, setDate }: DateTimePickerProps) {
             value={tempDate ? format(tempDate, "HH:mm") : ""}
             onChange={handleTimeChange}
           />
+          {error && (
+            <p className="text-sm text-red-500">{error}</p>
+          )}
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={handleCancel}>
               取消
