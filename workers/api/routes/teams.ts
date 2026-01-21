@@ -71,6 +71,8 @@ teamsRouter.post('/', async (c) => {
       title,
       description,
       rank_requirement,
+      start_time,
+      end_time,
       contact_method,
       contact_value,
       creator_id,
@@ -78,10 +80,10 @@ teamsRouter.post('/', async (c) => {
     } = body
 
     // 验证必填字段
-    if (!game || !title || !contact_method || !contact_value || !creator_id) {
+    if (!game || !title || !contact_method || !contact_value || !creator_id || !start_time || !end_time) {
       return c.json({
-        error: '游戏、标题、联系方式和创建者ID不能为空',
-        received: { game, title, contact_method, contact_value, creator_id }
+        error: '游戏、标题、开始时间、结束时间、联系方式和创建者ID不能为空',
+        received: { game, title, start_time, end_time, contact_method, contact_value, creator_id }
       }, 400)
     }
 
@@ -92,6 +94,8 @@ teamsRouter.post('/', async (c) => {
       title,
       description: description || null,
       rank_requirement: rank_requirement || null,
+      start_time: new Date(start_time),
+      end_time: new Date(end_time),
       contact_method,
       contact_value,
       creator_id,

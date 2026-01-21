@@ -15,6 +15,8 @@ export interface Team {
   title: string
   description: string | null
   rank_requirement: string | null
+  start_time: string
+  end_time: string
   contact_method: ContactMethod
   contact_value: string
   creator_id: number
@@ -31,6 +33,8 @@ export interface CreateTeamFormData {
   title: string
   description?: string
   rank_requirement?: string
+  start_time: string
+  end_time: string
   contact_method: ContactMethod
   contact_value: string
   max_members?: number

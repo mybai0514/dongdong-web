@@ -32,6 +32,8 @@ export default function CreateTeamPage() {
     title: string
     description: string
     rank_requirement: string
+    start_time: string
+    end_time: string
     contact_method: ContactMethod
     contact_value: string
     max_members: number
@@ -40,6 +42,8 @@ export default function CreateTeamPage() {
     title: '',
     description: '',
     rank_requirement: '不限',
+    start_time: '',
+    end_time: '',
     contact_method: 'wechat',
     contact_value: '',
     max_members: 5
@@ -86,6 +90,11 @@ export default function CreateTeamPage() {
     // 验证
     if (!formData.game || !formData.title) {
       setError('请填写游戏和标题')
+      return
+    }
+
+    if (!formData.start_time || !formData.end_time) {
+      setError('请选择开始时间和结束时间')
       return
     }
 
@@ -194,8 +203,8 @@ export default function CreateTeamPage() {
               {/* 段位要求 */}
               <div className="space-y-2">
                 <Label htmlFor="rank">段位要求</Label>
-                <Select 
-                  value={formData.rank_requirement} 
+                <Select
+                  value={formData.rank_requirement}
                   onValueChange={(value) => setFormData({ ...formData, rank_requirement: value })}
                 >
                   <SelectTrigger id="rank">
@@ -209,6 +218,32 @@ export default function CreateTeamPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* 游戏时间 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_time">开始时间 *</Label>
+                  <Input
+                    id="start_time"
+                    type="datetime-local"
+                    value={formData.start_time}
+                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                    required
+                    className="[&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_time">结束时间 *</Label>
+                  <Input
+                    id="end_time"
+                    type="datetime-local"
+                    value={formData.end_time}
+                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                    required
+                    className="[&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                </div>
               </div>
 
               {/* 队伍人数 */}

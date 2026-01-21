@@ -29,6 +29,8 @@ export const teams = sqliteTable('teams', {
   title: text('title').notNull(), // 组队标题
   description: text('description'), // 详细描述
   rank_requirement: text('rank_requirement'), // 段位要求：钻石、星耀等
+  start_time: integer('start_time', { mode: 'timestamp' }).notNull(), // 开始时间
+  end_time: integer('end_time', { mode: 'timestamp' }).notNull(), // 结束时间
   contact_method: text('contact_method').notNull(), // 联系方式：wechat/qq/yy
   contact_value: text('contact_value').notNull(), // 具体联系号码
   creator_id: integer('creator_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

@@ -145,21 +145,6 @@ export default function TeamsPage() {
     return matchSearch
   })
 
-  // 格式化时间
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
-    
-    if (minutes < 60) return `${minutes}分钟前`
-    if (hours < 24) return `${hours}小时前`
-    return `${days}天前`
-  }
-
   // 获取状态标签
   const getStatusBadge = (status: string, memberCount: number, maxMembers: number) => {
     if (status === 'full' || memberCount >= maxMembers) {
@@ -256,8 +241,8 @@ export default function TeamsPage() {
       ) : (
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {filteredTeams.map(team => (
-            <TeamCard 
-              key={team.id} 
+            <TeamCard
+              key={team.id}
               team={team}
               user={user}
               joiningTeamId={joiningTeamId}
@@ -265,7 +250,6 @@ export default function TeamsPage() {
               onShowContact={showContact}
               getStatusBadge={getStatusBadge}
               getContactIcon={getContactIcon}
-              formatTime={formatTime}
             />
           ))}
         </div>
@@ -332,8 +316,7 @@ function TeamCard({
   onJoin,
   onShowContact,
   getStatusBadge,
-  getContactIcon,
-  formatTime
+  getContactIcon
 }: {
   team: Team
   user: User | null
@@ -342,7 +325,6 @@ function TeamCard({
   onShowContact: (id: number) => void
   getStatusBadge: (status: string, count: number, max: number) => React.ReactNode
   getContactIcon: (method: string) => string
-  formatTime: (date: string) => string
 }) {
   const [memberStatus, setMemberStatus] = useState<MembershipStatus | null>(null)
 
@@ -401,6 +383,15 @@ function TeamCard({
           </div>
 
           <div className="flex items-center text-muted-foreground">
+            <Clock className="h-4 w-4 mr-2 shrink-0" />
+            <span className="truncate">
+              {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {' - '}
+              {new Date(team.end_time).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+
+          <div className="flex items-center text-muted-foreground">
             <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate">
               {memberStatus?.isMember && memberStatus.contact
@@ -408,11 +399,6 @@ function TeamCard({
                 : '加入后可见联系方式'
               }
             </span>
-          </div>
-
-          <div className="flex items-center text-muted-foreground">
-            <Clock className="h-4 w-4 mr-2 shrink-0" />
-            <span>{team.created_at ? formatTime(team.created_at) : '未知时间'}</span>
           </div>
         </div>
 
