@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, desc, or, and } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 import { teams, teamMembers, users } from '../../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { extractToken, validateToken } from '../utils/token'
@@ -24,7 +24,7 @@ teamsRouter.get('/', async (c) => {
     let query = db.select().from(teams)
 
     if (conditions.length > 0) {
-      query = query.where(conditions.length === 1 ? conditions[0] : or(...conditions)) as any
+      query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as any
     }
 
     const allTeams = await query.orderBy(desc(teams.created_at)).all()

@@ -48,6 +48,7 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedGame, setSelectedGame] = useState('全部')
+  const [selectedDate, setSelectedDate] = useState('')
 
   // 加入队伍相关状态
   const [joiningTeamId, setJoiningTeamId] = useState<number | null>(null)
@@ -142,7 +143,18 @@ export default function TeamsPage() {
   const filteredTeams = teams.filter(team => {
     const matchSearch = team.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                        team.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchSearch
+
+    if (!matchSearch) return false
+
+    if (selectedGame !== '全部' && team.game !== selectedGame) return false
+
+    if (selectedDate) {
+      const teamDate = new Date(team.start_time).toLocaleDateString('zh-CN')
+      const filterDate = new Date(selectedDate).toLocaleDateString('zh-CN')
+      if (teamDate !== filterDate) return false
+    }
+
+    return true
   })
 
   // 获取状态标签
@@ -215,6 +227,13 @@ export default function TeamsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="w-full md:w-50"
+        />
       </div>
 
       {/* 组队列表 */}
