@@ -41,7 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# ====== 推荐补充 ======
+# ===== 推荐补充 =====
 # Cloudflare Wrangler local state & temp
 .wrangler/
 
