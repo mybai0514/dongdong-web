@@ -15,7 +15,8 @@ import {
   Plus,
   Gamepad2,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Crown
 } from 'lucide-react'
 import {
   Select,
@@ -32,8 +33,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { User, Team, MembershipStatus, ContactMethod } from '@/types'
-import { getTeams, joinTeam, checkMembership, ApiError } from '@/lib/api'
+import type { User, Team, MembershipStatus, ContactMethod, TeamMember } from '@/types'
+import { getTeams, joinTeam, checkMembership, getTeamMembers, ApiError } from '@/lib/api'
 import { GAMES_WITH_ALL } from '@/lib/constants'
 import { useUser } from '@/hooks'
 
@@ -55,6 +56,15 @@ export default function TeamsPage() {
   const [contactDialog, setContactDialog] = useState<{
     open: boolean
     contact?: ContactInfo
+  }>({ open: false })
+
+  // 队友列表弹窗状态
+  const [membersDialog, setMembersDialog] = useState<{
+    open: boolean
+    teamId?: number
+    teamTitle?: string
+    members?: TeamMember[]
+    loading?: boolean
   }>({ open: false })
 
   // 获取组队列表
@@ -136,6 +146,36 @@ export default function TeamsPage() {
         open: true,
         contact: status.contact
       })
+    }
+  }
+
+  // 查看队友列表
+  const showMembers = async (teamId: number, teamTitle: string) => {
+    // 打开弹窗并开始加载
+    setMembersDialog({
+      open: true,
+      teamId,
+      teamTitle,
+      loading: true
+    })
+
+    try {
+      const members = await getTeamMembers(teamId)
+      setMembersDialog({
+        open: true,
+        teamId,
+        teamTitle,
+        members,
+        loading: false
+      })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message || '获取队友信息失败')
+      } else {
+        alert('网络错误，请稍后重试')
+      }
+      console.error('获取队友信息错误:', err)
+      setMembersDialog({ open: false })
     }
   }
 
@@ -274,6 +314,7 @@ export default function TeamsPage() {
               joiningTeamId={joiningTeamId}
               onJoin={handleJoinTeam}
               onShowContact={showContact}
+              onShowMembers={showMembers}
               getStatusBadge={getStatusBadge}
               getContactIcon={getContactIcon}
             />
@@ -330,6 +371,77 @@ export default function TeamsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 队友列表弹窗 */}
+      <Dialog open={membersDialog.open} onOpenChange={(open) => setMembersDialog({ open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              队友列表
+            </DialogTitle>
+            <DialogDescription>
+              {membersDialog.teamTitle}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {membersDialog.loading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
+              </div>
+            ) : membersDialog.members && membersDialog.members.length > 0 ? (
+              <div className="space-y-2">
+                {membersDialog.members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">
+                          {member.username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{member.username}</p>
+                          {member.isCreator && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Crown className="h-3 w-3 mr-1" />
+                              队长
+                            </Badge>
+                          )}
+                        </div>
+                        {member.joined_at && (
+                          <p className="text-xs text-muted-foreground">
+                            加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">暂无队友信息</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setMembersDialog({ open: false })}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -341,6 +453,7 @@ function TeamCard({
   joiningTeamId,
   onJoin,
   onShowContact,
+  onShowMembers,
   getStatusBadge,
   getContactIcon
 }: {
@@ -349,6 +462,7 @@ function TeamCard({
   joiningTeamId: number | null
   onJoin: (id: number) => void
   onShowContact: (id: number) => void
+  onShowMembers: (id: number, title: string) => void
   getStatusBadge: (status: string, count: number, max: number) => React.ReactNode
   getContactIcon: (method: string) => string
 }) {
@@ -418,37 +532,47 @@ function TeamCard({
         </div>
 
         {/* 操作按钮 */}
-        {memberStatus?.isMember ? (
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => onShowContact(team.id)}
+        <div className="flex gap-2">
+          {memberStatus?.isMember ? (
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => onShowContact(team.id)}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              查看联系方式
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              className="flex-1"
+              disabled={team.status !== 'open' || isJoining || !user}
+              onClick={() => onJoin(team.id)}
+            >
+              {isJoining ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  加入中...
+                </>
+              ) : team.status === 'open' ? (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  加入队伍
+                </>
+              ) : (
+                '已满员'
+              )}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => onShowMembers(team.id, team.title)}
           >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            查看联系方式
+            <Users className="mr-2 h-4 w-4" />
+            查看队友
           </Button>
-        ) : (
-          <Button 
-            variant="default" 
-            className="w-full"
-            disabled={team.status !== 'open' || isJoining || !user}
-            onClick={() => onJoin(team.id)}
-          >
-            {isJoining ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                加入中...
-              </>
-            ) : team.status === 'open' ? (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                加入队伍
-              </>
-            ) : (
-              '已满员'
-            )}
-          </Button>
-        )}
+        </div>
       </CardContent>
     </Card>
   )

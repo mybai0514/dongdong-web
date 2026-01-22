@@ -48,6 +48,7 @@ export interface TeamMember {
   user_id: number
   username: string
   joined_at: string | null
+  isCreator?: boolean
 }
 
 // 队伍成员身份检查结果

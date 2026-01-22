@@ -34,7 +34,6 @@ teamsRouter.get('/', async (c) => {
     if (token) {
       const user = await validateToken(db, token)
       if (user) {
-        const teamIds = allTeams.map(t => t.id)
         const memberships = await db.select()
           .from(teamMembers)
           .where(eq(teamMembers.user_id, user.id))
@@ -383,20 +382,15 @@ teamsRouter.post('/:id/leave', authMiddleware, async (c) => {
 })
 
 // 获取队伍成员列表
-teamsRouter.get('/:id/members', authMiddleware, async (c) => {
+teamsRouter.get('/:id/members', async (c) => {
   try {
     const teamId = c.req.param('id')
     const db = drizzle(c.env.DB)
-    const user = c.get('user')
 
-    // 检查是否是队长
+    // 检查队伍是否存在
     const team = await db.select().from(teams).where(eq(teams.id, Number(teamId))).get()
     if (!team) {
       return c.json({ error: '队伍不存在' }, 404)
-    }
-
-    if (team.creator_id !== user.id) {
-      return c.json({ error: '只有队长可以查看成员列表' }, 403)
     }
 
     // 获取成员列表（带用户名）
@@ -423,7 +417,31 @@ teamsRouter.get('/:id/members', authMiddleware, async (c) => {
       })
     )
 
-    return c.json(membersWithUsername)
+    // 添加队长到成员列表
+    const creator = await db.select({
+      id: users.id,
+      username: users.username
+    })
+      .from(users)
+      .where(eq(users.id, team.creator_id))
+      .get()
+
+    // 将队长添加到列表开头
+    const allMembers = [
+      {
+        id: 0, // 队长没有 teamMembers 记录，使用 0 作为 id
+        user_id: team.creator_id,
+        username: creator?.username || '未知用户',
+        joined_at: team.created_at, // 队长的加入时间就是队伍创建时间
+        isCreator: true
+      },
+      ...membersWithUsername.map(member => ({
+        ...member,
+        isCreator: false
+      }))
+    ]
+
+    return c.json(allMembers)
   } catch (error) {
     console.error('获取成员列表错误:', error)
     return c.json({ error: '获取成员列表失败' }, 500)
