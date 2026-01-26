@@ -545,6 +545,7 @@ function TeamCard({
   }
 
   const isJoining = joiningTeamId === team.id
+  const isFull = team.status === 'full' || team.member_count >= team.max_members
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -618,7 +619,7 @@ function TeamCard({
             <Button
               variant="default"
               className="flex-1"
-              disabled={team.status !== 'open' || isJoining || !user}
+              disabled={isFull || isJoining || !user}
               onClick={() => onJoin(team.id, team.title)}
             >
               {isJoining ? (
@@ -626,13 +627,13 @@ function TeamCard({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   加入中...
                 </>
-              ) : team.status === 'open' ? (
+              ) : isFull ? (
+                '已满员'
+              ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
                   加入队伍
                 </>
-              ) : (
-                '已满员'
               )}
             </Button>
           )}
