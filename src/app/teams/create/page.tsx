@@ -84,6 +84,31 @@ export default function CreateTeamPage() {
     }))
   }
 
+  // 当联系方式改变时，自动填充对应的联系方式值
+  const handleContactMethodChange = (method: ContactMethod) => {
+    let contactValue = ''
+
+    if (user) {
+      switch (method) {
+        case 'wechat':
+          contactValue = user.wechat || ''
+          break
+        case 'qq':
+          contactValue = user.qq || ''
+          break
+        case 'yy':
+          contactValue = user.yy || ''
+          break
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      contact_method: method,
+      contact_value: contactValue
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -291,7 +316,7 @@ export default function CreateTeamPage() {
                   <Label htmlFor="contact_method">联系方式类型 *</Label>
                   <Select
                     value={formData.contact_method}
-                    onValueChange={(value) => setFormData({ ...formData, contact_method: value as ContactMethod })}
+                    onValueChange={handleContactMethodChange}
                   >
                     <SelectTrigger id="contact_method">
                       <SelectValue />
