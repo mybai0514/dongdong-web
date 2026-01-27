@@ -42,10 +42,12 @@ import {
   submitTeamRatings,
   getTeamRatingStatus,
   getMyTeamRatings,
+  getUserReputation,
   ApiError,
   type TeamMemberRating,
   type RatingTag,
-  type RatingDetail
+  type RatingDetail,
+  type UserReputation
 } from '@/lib/api'
 import { useAuth } from '@/hooks'
 import type { Team, TeamMember } from '@/types'
@@ -71,6 +73,7 @@ export default function HistoryPage() {
     teamTitle?: string
     teamDescription?: string
     members?: TeamMember[]
+    memberReputations?: Map<number, UserReputation>
     loading?: boolean
   }>({ open: false })
 
@@ -164,12 +167,27 @@ export default function HistoryPage() {
 
     try {
       const members = await getTeamMembers(teamId)
+
+      // 批量获取成员信誉
+      const reputationMap = new Map<number, UserReputation>()
+      await Promise.all(
+        members.map(async (member) => {
+          try {
+            const rep = await getUserReputation(member.user_id)
+            reputationMap.set(member.user_id, rep)
+          } catch (error) {
+            console.error(`获取用户 ${member.user_id} 信誉失败:`, error)
+          }
+        })
+      )
+
       setMembersDialog({
         open: true,
         teamId,
         teamTitle,
         teamDescription,
         members,
+        memberReputations: reputationMap,
         loading: false
       })
     } catch (err) {
@@ -476,41 +494,65 @@ export default function HistoryPage() {
                   <h4 className="text-sm font-semibold mb-2">队友列表</h4>
                   {membersDialog.members && membersDialog.members.length > 0 ? (
                     <div className="space-y-2">
-                      {membersDialog.members.map((member) => (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="font-semibold text-primary">
-                                {member.username.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium">{member.username}</p>
-                                {member.isCreator && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    <Crown className="h-3 w-3 mr-1" />
-                                    队长
-                                  </Badge>
+                      {membersDialog.members.map((member) => {
+                        const memberRep = membersDialog.memberReputations?.get(member.user_id)
+                        return (
+                          <div
+                            key={member.id}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="font-semibold text-primary">
+                                  {member.username.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{member.username}</p>
+                                  {member.isCreator && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Crown className="h-3 w-3 mr-1" />
+                                      队长
+                                    </Badge>
+                                  )}
+                                </div>
+                                {member.joined_at && (
+                                  <p className="text-xs text-muted-foreground">
+                                    加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
+                                      month: '2-digit',
+                                      day: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
+                                )}
+                                {/* 显示信誉 */}
+                                {memberRep && memberRep.totalReviews > 0 && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex items-center gap-1">
+                                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                      <span className="text-xs font-medium">{memberRep.averageRating}</span>
+                                    </div>
+                                    {Object.keys(memberRep.tagStats).length > 0 && (
+                                      <div className="flex gap-1">
+                                        {Object.entries(memberRep.tagStats)
+                                          .sort(([, a], [, b]) => b - a)
+                                          .slice(0, 3)
+                                          .map(([tag]) => (
+                                            <Badge key={tag} variant="outline" className="text-xs px-1 py-0">
+                                              {tag}
+                                            </Badge>
+                                          ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                              {member.joined_at && (
-                                <p className="text-xs text-muted-foreground">
-                                  加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
-                                    month: '2-digit',
-                                    day: '2-digit',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8">

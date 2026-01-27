@@ -11,6 +11,15 @@ import type {
 } from '@/types'
 
 /**
+ * 用户信誉统计
+ */
+export interface UserReputation {
+  totalReviews: number
+  averageRating: number
+  tagStats: Record<string, number>
+}
+
+/**
  * 获取用户信息
  */
 export async function getUser(id: number): Promise<User> {
@@ -39,4 +48,11 @@ export async function updateUser(
   data: UserProfileUpdate
 ): Promise<SuccessResponse> {
   return put<SuccessResponse>(`/api/users/${userId}`, data)
+}
+
+/**
+ * 获取用户信誉统计
+ */
+export async function getUserReputation(userId: number): Promise<UserReputation> {
+  return get<UserReputation>(`/api/users/${userId}/reputation`)
 }

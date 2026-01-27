@@ -43,7 +43,10 @@ export {
   getUserTeams,
   getJoinedTeams,
   updateUser,
+  getUserReputation,
 } from './users'
+
+export type { UserReputation } from './users'
 
 // 反馈 API
 export {

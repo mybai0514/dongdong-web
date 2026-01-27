@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq, desc, or } from 'drizzle-orm'
-import { users, teams, teamMembers } from '../../../db/schema'
+import { users, teams, teamMembers, reviews } from '../../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { extractToken, validateToken } from '../utils/token'
 import type { Bindings } from '../types'
@@ -113,6 +113,61 @@ usersRouter.put('/:id', authMiddleware, async (c) => {
   } catch (error) {
     console.error('更新用户信息错误:', error)
     return c.json({ error: '更新失败' }, 500)
+  }
+})
+
+// 获取用户信誉统计
+usersRouter.get('/:id/reputation', async (c) => {
+  try {
+    const userId = c.req.param('id')
+    const db = drizzle(c.env.DB)
+
+    // 获取用户收到的所有评分
+    const userReviews = await db.select({
+      rating: reviews.rating,
+      tags: reviews.tags
+    })
+      .from(reviews)
+      .where(eq(reviews.reviewee_id, Number(userId)))
+      .all()
+
+    if (userReviews.length === 0) {
+      return c.json({
+        totalReviews: 0,
+        averageRating: 0,
+        tagStats: {}
+      })
+    }
+
+    // 计算平均评分
+    const totalRating = userReviews.reduce((sum, review) => sum + review.rating, 0)
+    const averageRating = totalRating / userReviews.length
+
+    // 统计标签出现次数
+    const tagStats: Record<string, number> = {}
+    userReviews.forEach(review => {
+      if (review.tags) {
+        try {
+          const tags = JSON.parse(review.tags)
+          if (Array.isArray(tags)) {
+            tags.forEach(tag => {
+              tagStats[tag] = (tagStats[tag] || 0) + 1
+            })
+          }
+        } catch (error) {
+          console.error('解析标签错误:', error)
+        }
+      }
+    })
+
+    return c.json({
+      totalReviews: userReviews.length,
+      averageRating: Math.round(averageRating * 10) / 10, // 保留一位小数
+      tagStats
+    })
+  } catch (error) {
+    console.error('获取用户信誉错误:', error)
+    return c.json({ error: '获取信誉失败' }, 500)
   }
 })
 

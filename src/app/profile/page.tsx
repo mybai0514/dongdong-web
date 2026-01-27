@@ -29,8 +29,9 @@ import {
   Crown,
   UserPlus,
   Loader2,
-  LogOut,
-  UserMinus
+  UserMinus,
+  Star,
+  Award
 } from 'lucide-react'
 import {
   getUserTeams,
@@ -39,7 +40,9 @@ import {
   leaveTeam,
   getTeamMembers,
   kickMember,
-  ApiError
+  getUserReputation,
+  ApiError,
+  type UserReputation
 } from '@/lib/api'
 import { useAuth } from '@/hooks'
 import type { Team, TeamMember } from '@/types'
@@ -66,6 +69,10 @@ export default function ProfilePage() {
   const [joinedTeams, setJoinedTeams] = useState<Team[]>([])
   const [loadingJoinedTeams, setLoadingJoinedTeams] = useState(true)
 
+  // 用户信誉
+  const [reputation, setReputation] = useState<UserReputation | null>(null)
+  const [loadingReputation, setLoadingReputation] = useState(true)
+
   // 退出队伍确认弹窗
   const [leaveDialog, setLeaveDialog] = useState<{
     open: boolean
@@ -81,6 +88,7 @@ export default function ProfilePage() {
     teamTitle?: string
     teamDescription?: string
     members?: TeamMember[]
+    memberReputations?: Map<number, UserReputation>
     loading?: boolean
     isCreator?: boolean
   }>({ open: false })
@@ -104,6 +112,7 @@ export default function ProfilePage() {
       })
       fetchMyTeams(user.id)
       fetchJoinedTeamsList()
+      fetchReputation(user.id)
     }
   }, [user])
 
@@ -130,6 +139,19 @@ export default function ProfilePage() {
       console.error('获取加入的队伍失败:', error)
     } finally {
       setLoadingJoinedTeams(false)
+    }
+  }
+
+  // 获取用户信誉
+  const fetchReputation = async (userId: number) => {
+    setLoadingReputation(true)
+    try {
+      const data = await getUserReputation(userId)
+      setReputation(data)
+    } catch (error) {
+      console.error('获取用户信誉失败:', error)
+    } finally {
+      setLoadingReputation(false)
     }
   }
 
@@ -186,12 +208,27 @@ export default function ProfilePage() {
 
     try {
       const members = await getTeamMembers(teamId)
+
+      // 批量获取成员信誉
+      const reputationMap = new Map<number, UserReputation>()
+      await Promise.all(
+        members.map(async (member) => {
+          try {
+            const rep = await getUserReputation(member.user_id)
+            reputationMap.set(member.user_id, rep)
+          } catch (error) {
+            console.error(`获取用户 ${member.user_id} 信誉失败:`, error)
+          }
+        })
+      )
+
       setMembersDialog({
         open: true,
         teamId,
         teamTitle,
         teamDescription,
         members,
+        memberReputations: reputationMap,
         loading: false,
         isCreator
       })
@@ -431,6 +468,73 @@ export default function ProfilePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* 信誉卡片 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-amber-500" />
+                我的信誉
+              </CardTitle>
+              <CardDescription>
+                基于队友对你的评价
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingReputation ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                </div>
+              ) : reputation && reputation.totalReviews > 0 ? (
+                <div className="space-y-4">
+                  {/* 平均评分 */}
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">平均评分</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold">{reputation.averageRating}</span>
+                      <span className="text-muted-foreground text-sm">/ 5.0</span>
+                    </div>
+                  </div>
+
+                  {/* 评价次数 */}
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-muted-foreground">收到评价</span>
+                    <span className="font-medium">{reputation.totalReviews} 次</span>
+                  </div>
+
+                  {/* 标签统计 */}
+                  {Object.keys(reputation.tagStats).length > 0 && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-sm font-medium mb-3">队友评价标签</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(reputation.tagStats)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([tag, count]) => (
+                              <Badge key={tag} variant="secondary" className="text-sm">
+                                {tag} × {count}
+                              </Badge>
+                            ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Award className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">暂无评价</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    完成组队后队友可以给你评分
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* 右侧：队伍列表 */}
@@ -660,56 +764,80 @@ export default function ProfilePage() {
                   <h4 className="text-sm font-semibold mb-2">队友列表</h4>
                   {membersDialog.members && membersDialog.members.length > 0 ? (
                     <div className="space-y-2">
-                      {membersDialog.members.map((member) => (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="font-semibold text-primary">
-                                {member.username.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium">{member.username}</p>
-                                {member.isCreator && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    <Crown className="h-3 w-3 mr-1" />
-                                    队长
-                                  </Badge>
+                      {membersDialog.members.map((member) => {
+                        const memberRep = membersDialog.memberReputations?.get(member.user_id)
+                        return (
+                          <div
+                            key={member.id}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="font-semibold text-primary">
+                                  {member.username.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{member.username}</p>
+                                  {member.isCreator && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Crown className="h-3 w-3 mr-1" />
+                                      队长
+                                    </Badge>
+                                  )}
+                                </div>
+                                {member.joined_at && (
+                                  <p className="text-xs text-muted-foreground">
+                                    加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
+                                      month: '2-digit',
+                                      day: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
+                                )}
+                                {/* 显示信誉 */}
+                                {memberRep && memberRep.totalReviews > 0 && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex items-center gap-1">
+                                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                                      <span className="text-xs font-medium">{memberRep.averageRating}</span>
+                                    </div>
+                                    {Object.keys(memberRep.tagStats).length > 0 && (
+                                      <div className="flex gap-1">
+                                        {Object.entries(memberRep.tagStats)
+                                          .sort(([, a], [, b]) => b - a)
+                                          .slice(0, 3)
+                                          .map(([tag]) => (
+                                            <Badge key={tag} variant="outline" className="text-xs px-1 py-0">
+                                              {tag}
+                                            </Badge>
+                                          ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                              {member.joined_at && (
-                                <p className="text-xs text-muted-foreground">
-                                  加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
-                                    month: '2-digit',
-                                    day: '2-digit',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              )}
                             </div>
+                            {membersDialog.isCreator && !member.isCreator && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setKickDialog({
+                                  open: true,
+                                  teamId: membersDialog.teamId,
+                                  userId: member.user_id,
+                                  username: member.username
+                                })}
+                              >
+                                <UserMinus className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
-                          {membersDialog.isCreator && !member.isCreator && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setKickDialog({
-                                open: true,
-                                teamId: membersDialog.teamId,
-                                userId: member.user_id,
-                                username: member.username
-                              })}
-                            >
-                              <UserMinus className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8">
