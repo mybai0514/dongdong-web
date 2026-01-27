@@ -29,7 +29,8 @@ import {
   Crown,
   UserPlus,
   Loader2,
-  LogOut
+  LogOut,
+  UserMinus
 } from 'lucide-react'
 import {
   getUserTeams,
@@ -37,6 +38,7 @@ import {
   updateUser,
   leaveTeam,
   getTeamMembers,
+  kickMember,
   ApiError
 } from '@/lib/api'
 import { useAuth } from '@/hooks'
@@ -80,7 +82,17 @@ export default function ProfilePage() {
     teamDescription?: string
     members?: TeamMember[]
     loading?: boolean
+    isCreator?: boolean
   }>({ open: false })
+
+  // 踢出队友确认弹窗
+  const [kickDialog, setKickDialog] = useState<{
+    open: boolean
+    teamId?: number
+    userId?: number
+    username?: string
+  }>({ open: false })
+  const [kicking, setKicking] = useState(false)
 
   // 用户信息加载后，初始化表单和获取队伍数据
   useEffect(() => {
@@ -161,14 +173,15 @@ export default function ProfilePage() {
   }
 
   // 查看队伍详情
-  const showMembers = async (teamId: number, teamTitle: string, teamDescription?: string) => {
+  const showMembers = async (teamId: number, teamTitle: string, teamDescription?: string, isCreator: boolean = false) => {
     // 打开弹窗并开始加载
     setMembersDialog({
       open: true,
       teamId,
       teamTitle,
       teamDescription,
-      loading: true
+      loading: true,
+      isCreator
     })
 
     try {
@@ -179,7 +192,8 @@ export default function ProfilePage() {
         teamTitle,
         teamDescription,
         members,
-        loading: false
+        loading: false,
+        isCreator
       })
     } catch (err) {
       if (err instanceof ApiError) {
@@ -189,6 +203,31 @@ export default function ProfilePage() {
       }
       console.error('获取队伍信息错误:', err)
       setMembersDialog({ open: false })
+    }
+  }
+
+  // 踢出队友
+  const handleKickMember = async () => {
+    if (!kickDialog.teamId || !kickDialog.userId) return
+
+    setKicking(true)
+    try {
+      await kickMember(kickDialog.teamId, kickDialog.userId)
+      // 刷新队伍成员列表
+      if (membersDialog.teamId) {
+        const members = await getTeamMembers(membersDialog.teamId)
+        setMembersDialog(prev => ({ ...prev, members }))
+      }
+      setKickDialog({ open: false })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        alert(err.message || '踢出失败')
+      } else {
+        alert('网络错误，请稍后重试')
+      }
+      console.error('踢出队友错误:', err)
+    } finally {
+      setKicking(false)
     }
   }
 
@@ -451,16 +490,16 @@ export default function ProfilePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => showMembers(team.id, team.title, team.description || undefined)}
+                          onClick={() => showMembers(team.id, team.title, team.description || undefined, true)}
                         >
                           <Users className="mr-1 h-3 w-3" />
                           查看队伍
                         </Button>
-                        {!isTeamCompleted(team.end_time) && (
+                        {/* {!isTeamCompleted(team.end_time) && (
                           <Button variant="outline" size="sm" asChild>
                             <Link href={`/teams/${team.id}/manage`}>管理</Link>
                           </Button>
-                        )}
+                        )} */}
                       </div>
                     </div>
                   ))}
@@ -528,14 +567,6 @@ export default function ProfilePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => showMembers(team.id, team.title, team.description || undefined)}
-                        >
-                          <Users className="mr-1 h-3 w-3" />
-                          查看队伍
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
                           onClick={() => setLeaveDialog({
                             open: true,
                             teamId: team.id,
@@ -543,6 +574,14 @@ export default function ProfilePage() {
                           })}
                         >
                           退出
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => showMembers(team.id, team.title, team.description || undefined)}
+                        >
+                          <Users className="mr-1 h-3 w-3" />
+                          查看队伍
                         </Button>
                       </div>
                     </div>
@@ -654,6 +693,21 @@ export default function ProfilePage() {
                               )}
                             </div>
                           </div>
+                          {membersDialog.isCreator && !member.isCreator && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setKickDialog({
+                                open: true,
+                                teamId: membersDialog.teamId,
+                                userId: member.user_id,
+                                username: member.username
+                              })}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -670,6 +724,40 @@ export default function ProfilePage() {
           <DialogFooter>
             <Button onClick={() => setMembersDialog({ open: false })}>
               关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 踢出队友确认弹窗 */}
+      <Dialog open={kickDialog.open} onOpenChange={(open) => setKickDialog({ open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认踢出队友</DialogTitle>
+            <DialogDescription>
+              你确定要将「{kickDialog.username}」踢出队伍吗？此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setKickDialog({ open: false })}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleKickMember}
+              disabled={kicking}
+            >
+              {kicking ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  踢出中...
+                </>
+              ) : (
+                '确认踢出'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
