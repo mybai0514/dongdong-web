@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq, desc, and } from 'drizzle-orm'
-import { teams, teamMembers, users } from '../../../db/schema'
+import { teams, teamMembers, users, reviews } from '../../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { extractToken, validateToken } from '../utils/token'
 import type { Bindings } from '../types'
@@ -546,6 +546,183 @@ teamsRouter.delete('/:id/members/:userId', authMiddleware, async (c) => {
   } catch (error) {
     console.error('踢出成员错误:', error)
     return c.json({ error: '踢出失败' }, 500)
+  }
+})
+
+// 提交队伍评分
+teamsRouter.post('/:id/ratings', authMiddleware, async (c) => {
+  try {
+    const teamId = c.req.param('id')
+    const db = drizzle(c.env.DB)
+    const user = c.get('user')
+
+    let body
+    try {
+      body = await c.req.json()
+    } catch (parseError) {
+      console.error('JSON 解析错误:', parseError)
+      return c.json({ error: '请求数据格式错误' }, 400)
+    }
+
+    const { ratings } = body
+
+    if (!ratings || !Array.isArray(ratings)) {
+      return c.json({ error: '评分数据格式错误' }, 400)
+    }
+
+    // 检查队伍是否存在
+    const team = await db.select().from(teams).where(eq(teams.id, Number(teamId))).get()
+    if (!team) {
+      return c.json({ error: '队伍不存在' }, 404)
+    }
+
+    // 检查队伍是否已完成
+    const now = new Date()
+    if (team.end_time > now) {
+      return c.json({ error: '只能对已完成的队伍进行评分' }, 400)
+    }
+
+    // 检查用户是否是队伍成员
+    const isCreator = team.creator_id === user.id
+    const isMember = await db.select()
+      .from(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.team_id, Number(teamId)),
+          eq(teamMembers.user_id, user.id)
+        )
+      )
+      .get()
+
+    if (!isCreator && !isMember) {
+      return c.json({ error: '只有队伍成员可以评分' }, 403)
+    }
+
+    // 检查是否已经评分过
+    const existingRating = await db.select()
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.team_id, Number(teamId)),
+          eq(reviews.reviewer_id, user.id)
+        )
+      )
+      .get()
+
+    if (existingRating) {
+      return c.json({ error: '你已经对这个队伍进行过评分了' }, 400)
+    }
+
+    // 批量插入评分
+    for (const rating of ratings) {
+      const { userId, rating: score, tags } = rating
+
+      // 验证评分数据
+      if (!userId || !score || score < 1 || score > 5) {
+        return c.json({ error: '评分数据无效' }, 400)
+      }
+
+      // 不能给自己评分
+      if (userId === user.id) {
+        continue
+      }
+
+      // 插入评分记录
+      await db.insert(reviews).values({
+        reviewer_id: user.id,
+        reviewee_id: userId,
+        team_id: Number(teamId),
+        rating: score,
+        tags: JSON.stringify(tags || []),
+        comment: null,
+        created_at: new Date()
+      }).run()
+    }
+
+    console.log(`✅ 用户 ${user.id} 对队伍 ${teamId} 提交了评分`)
+
+    return c.json({
+      success: true,
+      message: '评分提交成功'
+    })
+  } catch (error) {
+    console.error('提交评分错误:', error)
+    return c.json({ error: '提交评分失败', details: String(error) }, 500)
+  }
+})
+
+// 获取队伍评分状态
+teamsRouter.get('/:id/ratings/status', authMiddleware, async (c) => {
+  try {
+    const teamId = c.req.param('id')
+    const db = drizzle(c.env.DB)
+    const user = c.get('user')
+
+    // 检查用户是否已经对该队伍评分
+    const existingRating = await db.select()
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.team_id, Number(teamId)),
+          eq(reviews.reviewer_id, user.id)
+        )
+      )
+      .get()
+
+    return c.json({
+      hasRated: !!existingRating
+    })
+  } catch (error) {
+    console.error('获取评分状态错误:', error)
+    return c.json({ error: '获取评分状态失败' }, 500)
+  }
+})
+
+// 获取用户对队伍的评分详情
+teamsRouter.get('/:id/ratings/my', authMiddleware, async (c) => {
+  try {
+    const teamId = c.req.param('id')
+    const db = drizzle(c.env.DB)
+    const user = c.get('user')
+
+    // 获取用户对该队伍的所有评分记录
+    const ratings = await db.select({
+      id: reviews.id,
+      reviewee_id: reviews.reviewee_id,
+      rating: reviews.rating,
+      tags: reviews.tags,
+      comment: reviews.comment,
+      created_at: reviews.created_at
+    })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.team_id, Number(teamId)),
+          eq(reviews.reviewer_id, user.id)
+        )
+      )
+      .all()
+
+    // 获取被评分者的用户名
+    const ratingsWithUsername = await Promise.all(
+      ratings.map(async (rating) => {
+        const reviewee = await db.select({ username: users.username })
+          .from(users)
+          .where(eq(users.id, rating.reviewee_id))
+          .get()
+
+        return {
+          ...rating,
+          username: reviewee?.username || '未知用户',
+          tags: rating.tags ? JSON.parse(rating.tags) : []
+        }
+      })
+    )
+
+    return c.json(ratingsWithUsername)
+  } catch (error) {
+    console.error('获取评分详情错误:', error)
+    return c.json({ error: '获取评分详情失败' }, 500)
   }
 })
 

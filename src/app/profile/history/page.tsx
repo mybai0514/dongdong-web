@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +17,8 @@ import {
   Loader2,
   Search,
   Filter,
-  ArrowLeft
+  ArrowLeft,
+  Star
 } from 'lucide-react'
 import {
   Select,
@@ -37,7 +39,13 @@ import {
   getUserTeams,
   getJoinedTeams,
   getTeamMembers,
-  ApiError
+  submitTeamRatings,
+  getTeamRatingStatus,
+  getMyTeamRatings,
+  ApiError,
+  type TeamMemberRating,
+  type RatingTag,
+  type RatingDetail
 } from '@/lib/api'
 import { useAuth } from '@/hooks'
 import type { Team, TeamMember } from '@/types'
@@ -66,6 +74,29 @@ export default function HistoryPage() {
     loading?: boolean
   }>({ open: false })
 
+  // 评分弹窗状态
+  const [ratingDialog, setRatingDialog] = useState<{
+    open: boolean
+    teamId?: number
+    teamTitle?: string
+    members?: TeamMember[]
+    loading?: boolean
+  }>({ open: false })
+
+  // 查看评分历史弹窗状态
+  const [viewRatingDialog, setViewRatingDialog] = useState<{
+    open: boolean
+    teamId?: number
+    teamTitle?: string
+    ratings?: RatingDetail[]
+    loading?: boolean
+  }>({ open: false })
+
+  // 评分数据
+  const [ratings, setRatings] = useState<Record<number, { rating: number; tags: RatingTag[] }>>({})
+  const [submittingRating, setSubmittingRating] = useState(false)
+  const [ratedTeams, setRatedTeams] = useState<Set<number>>(new Set())
+
   useEffect(() => {
     if (user) {
       fetchMyTeams(user.id)
@@ -78,6 +109,8 @@ export default function HistoryPage() {
     try {
       const data = await getUserTeams(userId)
       setMyTeams(data)
+      // 检查已完成队伍的评分状态
+      await checkRatingStatus(data)
     } catch (error) {
       console.error('获取我的队伍失败:', error)
     } finally {
@@ -90,11 +123,34 @@ export default function HistoryPage() {
     try {
       const data = await getJoinedTeams()
       setJoinedTeams(data)
+      // 检查已完成队伍的评分状态
+      await checkRatingStatus(data)
     } catch (error) {
       console.error('获取加入的队伍失败:', error)
     } finally {
       setLoadingJoinedTeams(false)
     }
+  }
+
+  // 检查队伍评分状态
+  const checkRatingStatus = async (teams: Team[]) => {
+    const completedTeams = teams.filter(team => isTeamCompleted(team.end_time))
+    const ratedTeamIds = new Set<number>()
+
+    await Promise.all(
+      completedTeams.map(async (team) => {
+        try {
+          const status = await getTeamRatingStatus(team.id)
+          if (status.hasRated) {
+            ratedTeamIds.add(team.id)
+          }
+        } catch (error) {
+          console.error(`检查队伍 ${team.id} 评分状态失败:`, error)
+        }
+      })
+    )
+
+    setRatedTeams(prev => new Set([...prev, ...ratedTeamIds]))
   }
 
   const showMembers = async (teamId: number, teamTitle: string, teamDescription?: string) => {
@@ -118,12 +174,76 @@ export default function HistoryPage() {
       })
     } catch (err) {
       if (err instanceof ApiError) {
-        alert(err.message || '获取队伍信息失败')
+        toast.error(err.message || '获取队伍信息失败')
       } else {
-        alert('网络错误，请稍后重试')
+        toast.error('网络错误，请稍后重试')
       }
       console.error('获取队伍信息错误:', err)
       setMembersDialog({ open: false })
+    }
+  }
+
+  const openRatingDialog = async (teamId: number, teamTitle: string) => {
+    setRatingDialog({
+      open: true,
+      teamId,
+      teamTitle,
+      loading: true
+    })
+
+    try {
+      const members = await getTeamMembers(teamId)
+      // 过滤掉当前用户（使用 user_id 而不是 id）
+      const otherMembers = members.filter(m => m.user_id !== user?.id)
+      setRatingDialog({
+        open: true,
+        teamId,
+        teamTitle,
+        members: otherMembers,
+        loading: false
+      })
+      // 初始化评分数据（使用 user_id 作为 key）
+      const initialRatings: Record<number, { rating: number; tags: RatingTag[] }> = {}
+      otherMembers.forEach(member => {
+        initialRatings[member.user_id] = { rating: 0, tags: [] }
+      })
+      setRatings(initialRatings)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(err.message || '获取队伍信息失败')
+      } else {
+        toast.error('网络错误，请稍后重试')
+      }
+      console.error('获取队伍信息错误:', err)
+      setRatingDialog({ open: false })
+    }
+  }
+
+  const openViewRatingDialog = async (teamId: number, teamTitle: string) => {
+    setViewRatingDialog({
+      open: true,
+      teamId,
+      teamTitle,
+      loading: true
+    })
+
+    try {
+      const ratingsData = await getMyTeamRatings(teamId)
+      setViewRatingDialog({
+        open: true,
+        teamId,
+        teamTitle,
+        ratings: ratingsData,
+        loading: false
+      })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(err.message || '获取评分详情失败')
+      } else {
+        toast.error('网络错误，请稍后重试')
+      }
+      console.error('获取评分详情错误:', err)
+      setViewRatingDialog({ open: false })
     }
   }
 
@@ -291,6 +411,25 @@ export default function HistoryPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
+                    {ratedTeams.has(team.id) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openViewRatingDialog(team.id, team.title)}
+                      >
+                        <Star className="mr-1 h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        查看评分
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => openRatingDialog(team.id, team.title)}
+                      >
+                        <Star className="mr-1 h-3 w-3" />
+                        评分
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -385,6 +524,253 @@ export default function HistoryPage() {
           </div>
           <DialogFooter>
             <Button onClick={() => setMembersDialog({ open: false })}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 评分弹窗 */}
+      <Dialog open={ratingDialog.open} onOpenChange={(open) => setRatingDialog({ open })}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5" />
+              队伍评分
+            </DialogTitle>
+            <DialogDescription>
+              {ratingDialog.teamTitle}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4">
+            {ratingDialog.loading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
+              </div>
+            ) : ratingDialog.members && ratingDialog.members.length > 0 ? (
+              <div className="space-y-6">
+                {ratingDialog.members.map((member) => (
+                  <div key={member.user_id} className="p-4 border rounded-lg space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">
+                          {member.username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="font-medium">{member.username}</p>
+                    </div>
+
+                    {/* 星级评分 */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">评分</p>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => {
+                              setRatings(prev => ({
+                                ...prev,
+                                [member.user_id]: {
+                                  ...prev[member.user_id],
+                                  rating: star
+                                }
+                              }))
+                            }}
+                            className="transition-colors"
+                          >
+                            <Star
+                              className={`h-6 w-6 ${
+                                ratings[member.user_id]?.rating >= star
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 标签选择 */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">标签</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(['素质队友', '操作怪', '意识好', '嘴硬', '迟到', '口臭佬'] as RatingTag[]).map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant={ratings[member.user_id]?.tags.includes(tag) ? 'default' : 'outline'}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setRatings(prev => {
+                                const currentTags = prev[member.user_id]?.tags || []
+                                const newTags = currentTags.includes(tag)
+                                  ? currentTags.filter(t => t !== tag)
+                                  : [...currentTags, tag]
+                                return {
+                                  ...prev,
+                                  [member.user_id]: {
+                                    ...prev[member.user_id],
+                                    tags: newTags
+                                  }
+                                }
+                              })
+                            }}
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">没有可评分的队友</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRatingDialog({ open: false })}
+              disabled={submittingRating}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!ratingDialog.teamId) return
+
+                // 验证所有队友都已评分
+                const allRated = ratingDialog.members?.every(
+                  member => ratings[member.user_id]?.rating > 0
+                )
+
+                if (!allRated) {
+                  toast.warning('请为所有队友评分')
+                  return
+                }
+
+                setSubmittingRating(true)
+                try {
+                  const ratingsData: TeamMemberRating[] = ratingDialog.members!.map(member => ({
+                    userId: member.user_id,
+                    rating: ratings[member.user_id].rating,
+                    tags: ratings[member.user_id].tags
+                  }))
+
+                  await submitTeamRatings(ratingDialog.teamId, ratingsData)
+                  setRatedTeams(prev => new Set([...prev, ratingDialog.teamId!]))
+                  toast.success('评分提交成功！感谢你的反馈')
+                  setRatingDialog({ open: false })
+                  setRatings({})
+                } catch (err) {
+                  if (err instanceof ApiError) {
+                    toast.error(err.message || '提交评分失败')
+                  } else {
+                    toast.error('网络错误，请稍后重试')
+                  }
+                  console.error('提交评分错误:', err)
+                } finally {
+                  setSubmittingRating(false)
+                }
+              }}
+              disabled={submittingRating}
+            >
+              {submittingRating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  提交中...
+                </>
+              ) : (
+                '提交评分'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 查看评分历史弹窗 */}
+      <Dialog open={viewRatingDialog.open} onOpenChange={(open) => setViewRatingDialog({ open })}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+              评分历史
+            </DialogTitle>
+            <DialogDescription>
+              {viewRatingDialog.teamTitle}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4">
+            {viewRatingDialog.loading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
+              </div>
+            ) : viewRatingDialog.ratings && viewRatingDialog.ratings.length > 0 ? (
+              <div className="space-y-6">
+                {viewRatingDialog.ratings.map((rating) => (
+                  <div key={rating.id} className="p-4 border rounded-lg space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">
+                          {rating.username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="font-medium">{rating.username}</p>
+                    </div>
+
+                    {/* 星级评分（只读） */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">评分</p>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-6 w-6 ${
+                              rating.rating >= star
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 标签（只读） */}
+                    {rating.tags && rating.tags.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">标签</p>
+                        <div className="flex flex-wrap gap-2">
+                          {rating.tags.map((tag) => (
+                            <Badge key={tag} variant="default">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 评分时间 */}
+                    <div className="text-xs text-muted-foreground">
+                      评分时间: {new Date(rating.created_at).toLocaleString('zh-CN')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Star className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">暂无评分记录</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setViewRatingDialog({ open: false })}>
               关闭
             </Button>
           </DialogFooter>

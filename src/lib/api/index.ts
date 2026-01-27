@@ -51,3 +51,12 @@ export {
   getUserFeedback,
   getMonthFeedback,
 } from './feedback'
+
+// 评分 API
+export {
+  submitTeamRatings,
+  getTeamRatingStatus,
+  getMyTeamRatings,
+} from './ratings'
+
+export type { RatingTag, TeamMemberRating, RatingDetail } from './ratings'
