@@ -52,6 +52,7 @@ import {
 import { useAuth } from '@/hooks'
 import type { Team, TeamMember } from '@/types'
 import { GAMES_WITH_ALL } from '@/lib/constants'
+import { formatTimeForDisplay } from '@/lib/time'
 
 export default function HistoryPage() {
   const { user, loading } = useAuth({
@@ -416,9 +417,9 @@ export default function HistoryPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {formatTimeForDisplay(team.start_time)}
                         {' - '}
-                        {new Date(team.end_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {formatTimeForDisplay(team.end_time)}
                       </span>
                     </div>
                     {activeTab === 'joined' && team.contact_method && team.contact_value && (
@@ -521,12 +522,7 @@ export default function HistoryPage() {
                                 </div>
                                 {member.joined_at && (
                                   <p className="text-xs text-muted-foreground">
-                                    加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
+                                    加入于 {formatTimeForDisplay(member.joined_at)}
                                   </p>
                                 )}
                                 {/* 显示信誉 */}
@@ -805,7 +801,7 @@ export default function HistoryPage() {
 
                     {/* 评分时间 */}
                     <div className="text-xs text-muted-foreground">
-                      评分时间: {new Date(rating.created_at).toLocaleString('zh-CN')}
+                      评分时间: {formatTimeForDisplay(rating.created_at)}
                     </div>
                   </div>
                 ))}

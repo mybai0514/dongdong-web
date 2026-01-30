@@ -48,6 +48,7 @@ import type { User, Team, MembershipStatus, ContactMethod, TeamMember } from '@/
 import { getTeams, joinTeam, checkMembership, getTeamMembers, getUserReputation, ApiError, type UserReputation } from '@/lib/api'
 import { GAMES_WITH_ALL } from '@/lib/constants'
 import { useUser } from '@/hooks'
+import { formatTimeForDisplay, getDateStringUTC8 } from '@/lib/time'
 
 interface ContactInfo {
   method: ContactMethod
@@ -106,14 +107,8 @@ export default function TeamsPage() {
   const fetchTeamsList = async () => {
     setLoading(true)
     try {
-      // 格式化日期为本地时间的 YYYY-MM-DD 格式
-      let formattedDate: string | undefined
-      if (selectedDate) {
-        const year = selectedDate.getFullYear()
-        const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
-        const day = String(selectedDate.getDate()).padStart(2, '0')
-        formattedDate = `${year}-${month}-${day}`
-      }
+      // 使用 UTC+8 时区的日期字符串
+      const formattedDate = selectedDate ? getDateStringUTC8(selectedDate) : undefined
 
       const data = await getTeams({
         game: selectedGame,
@@ -546,12 +541,7 @@ export default function TeamsPage() {
                                 </div>
                                 {member.joined_at && (
                                   <p className="text-xs text-muted-foreground">
-                                    加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
+                                    加入于 {formatTimeForDisplay(member.joined_at)}
                                   </p>
                                 )}
                                 {/* 显示信誉 */}
@@ -704,9 +694,9 @@ function TeamCard({
           <div className="flex items-center text-muted-foreground">
             <Clock className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate">
-              {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {formatTimeForDisplay(team.start_time)}
               {' - '}
-              {new Date(team.end_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {formatTimeForDisplay(team.end_time)}
             </span>
           </div>
 

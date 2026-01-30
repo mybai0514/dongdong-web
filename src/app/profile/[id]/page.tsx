@@ -28,6 +28,7 @@ import {
   type UserReputation
 } from '@/lib/api'
 import type { User, Team } from '@/types'
+import { formatTimeForDisplay } from '@/lib/time'
 
 export default function UserProfilePage() {
   const params = useParams()
@@ -382,9 +383,9 @@ export default function UserProfilePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.start_time)}
                             {' - '}
-                            {new Date(team.end_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.end_time)}
                           </span>
                         </div>
                       </div>
@@ -437,9 +438,9 @@ export default function UserProfilePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.start_time)}
                             {' - '}
-                            {new Date(team.end_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.end_time)}
                           </span>
                         </div>
                       </div>

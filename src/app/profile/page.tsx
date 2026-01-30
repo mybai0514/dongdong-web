@@ -47,6 +47,7 @@ import {
 } from '@/lib/api'
 import { useAuth } from '@/hooks'
 import type { Team, TeamMember } from '@/types'
+import { formatTimeForDisplay } from '@/lib/time'
 
 export default function ProfilePage() {
   // 使用 useAuth 处理认证，未登录自动跳转
@@ -653,9 +654,9 @@ export default function ProfilePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.start_time)}
                             {' - '}
-                            {new Date(team.end_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.end_time)}
                           </span>
                         </div>
                       </div>
@@ -726,9 +727,9 @@ export default function ProfilePage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(team.start_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.start_time)}
                             {' - '}
-                            {new Date(team.end_time).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {formatTimeForDisplay(team.end_time)}
                           </span>
                         </div>
                         <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
@@ -860,12 +861,7 @@ export default function ProfilePage() {
                                 </div>
                                 {member.joined_at && (
                                   <p className="text-xs text-muted-foreground">
-                                    加入于 {new Date(member.joined_at).toLocaleString('zh-CN', {
-                                      month: '2-digit',
-                                      day: '2-digit',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
+                                    加入于 {formatTimeForDisplay(member.joined_at)}
                                   </p>
                                 )}
                                 {/* 显示信誉 */}

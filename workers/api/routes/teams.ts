@@ -4,6 +4,7 @@ import { eq, desc, and } from 'drizzle-orm'
 import { teams, teamMembers, users, reviews } from '../../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { extractToken, validateToken } from '../utils/token'
+import { formatDateUTC8, getNowUTC8, isSameDayUTC8 } from '../utils/time'
 import type { Bindings } from '../types'
 
 const teamsRouter = new Hono<{ Bindings: Bindings }>()
@@ -46,21 +47,8 @@ teamsRouter.get('/', async (c) => {
     if (date) {
       allTeams = allTeams.filter(team => {
         try {
-          // 将 start_time 转换为 ISO 字符串，提取日期部分（不受时区影响）
-          const startTime = team.start_time
-          let teamDateStr: string
-
-          if (startTime instanceof Date) {
-            // 如果是 Date 对象，转为 ISO 字符串
-            teamDateStr = startTime.toISOString().split('T')[0]
-          } else if (typeof startTime === 'string') {
-            // 如果是字符串，直接提取日期部分
-            teamDateStr = startTime.split('T')[0]
-          } else {
-            return false
-          }
-
-          return teamDateStr === date
+          // 使用 UTC+8 时区比较日期
+          return isSameDayUTC8(team.start_time, date)
         } catch (error) {
           console.error('日期解析错误:', error, team.start_time)
           return false
@@ -68,8 +56,8 @@ teamsRouter.get('/', async (c) => {
       })
     }
 
-    // 过滤已过期的队伍
-    const now = new Date()
+    // 过滤已过期的队伍（使用 UTC+8 时区比较）
+    const now = getNowUTC8()
     allTeams = allTeams.filter(team => new Date(team.end_time) >= now)
 
     // 计算分页
@@ -632,8 +620,8 @@ teamsRouter.post('/:id/ratings', authMiddleware, async (c) => {
       return c.json({ error: '队伍不存在' }, 404)
     }
 
-    // 检查队伍是否已完成
-    const now = new Date()
+    // 检查队伍是否已完成（使用 UTC+8 时区比较）
+    const now = getNowUTC8()
     if (team.end_time > now) {
       return c.json({ error: '只能对已完成的队伍进行评分' }, 400)
     }
