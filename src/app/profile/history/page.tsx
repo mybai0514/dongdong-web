@@ -36,6 +36,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
+import {
   getUserTeams,
   getUserJoinedTeams,
   getTeamMembers,
@@ -66,6 +75,10 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedGame, setSelectedGame] = useState('全部')
   const [activeTab, setActiveTab] = useState<'created' | 'joined'>('created')
+
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10 // 每页显示 10 条历史记录
 
   // 队伍详情弹窗状态
   const [membersDialog, setMembersDialog] = useState<{
@@ -107,6 +120,11 @@ export default function HistoryPage() {
       fetchJoinedTeamsList(user.id)
     }
   }, [user])
+
+  // 当筛选条件改变时，重置分页到第一页
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedGame, activeTab])
 
   const fetchMyTeams = async (userId: number) => {
     setLoadingMyTeams(true)
@@ -305,6 +323,12 @@ export default function HistoryPage() {
   const currentTeams = activeTab === 'created' ? filteredMyTeams : filteredJoinedTeams
   const currentLoading = activeTab === 'created' ? loadingMyTeams : loadingJoinedTeams
 
+  // 分页计算
+  const totalPages = Math.ceil(currentTeams.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedTeams = currentTeams.slice(startIndex, endIndex)
+
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -399,7 +423,7 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {currentTeams.map(team => (
+              {paginatedTeams.map(team => (
                 <div
                   key={team.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -460,6 +484,64 @@ export default function HistoryPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 分页组件 */}
+          {!currentLoading && currentTeams.length > 0 && totalPages > 1 && (
+            <div className="mt-6 pt-4 border-t">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+
+                  {/* 页码显示逻辑 */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // 显示第一页、最后一页、当前页及其前后各一页
+                    const showPage =
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+
+                    // 显示省略号
+                    const showEllipsisBefore = page === currentPage - 2 && currentPage > 3
+                    const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2
+
+                    if (showEllipsisBefore || showEllipsisAfter) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )
+                    }
+
+                    if (!showPage) return null
+
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </CardContent>
