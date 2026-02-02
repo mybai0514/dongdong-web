@@ -430,6 +430,7 @@ export default function HistoryPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="shrink-0 text-xs font-mono">ID: {team.id}</Badge>
                       <Badge variant="outline">{team.game}</Badge>
                       <Badge variant="secondary">已完成</Badge>
                     </div>

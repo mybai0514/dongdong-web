@@ -372,6 +372,7 @@ export default function UserProfilePage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="shrink-0 text-xs font-mono">ID: {team.id}</Badge>
                           <Badge variant="outline">{team.game}</Badge>
                           {getStatusBadge(team.status, team.member_count, team.max_members, team.end_time)}
                         </div>
@@ -427,6 +428,7 @@ export default function UserProfilePage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="shrink-0 text-xs font-mono">ID: {team.id}</Badge>
                           <Badge variant="outline">{team.game}</Badge>
                           {getStatusBadge(team.status, team.member_count, team.max_members, team.end_time)}
                         </div>
