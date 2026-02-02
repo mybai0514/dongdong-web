@@ -27,6 +27,7 @@ export interface Team {
   updated_at: string | null
   isMember?: boolean
   isCreator?: boolean
+  hasRated?: boolean // 当前用户是否已评分（仅在历史队伍列表中返回）
 }
 
 // 分页响应

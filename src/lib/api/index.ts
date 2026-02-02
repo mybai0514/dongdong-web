@@ -59,6 +59,7 @@ export {
 export {
   submitTeamRatings,
   getTeamRatingStatus,
+  getTeamRatingStatusBatch,
   getMyTeamRatings,
 } from './ratings'
 

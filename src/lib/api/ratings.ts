@@ -55,3 +55,12 @@ export async function getTeamRatingStatus(teamId: number): Promise<{ hasRated: b
 export async function getMyTeamRatings(teamId: number): Promise<RatingDetail[]> {
   return get<RatingDetail[]>(`/api/teams/${teamId}/ratings/my`)
 }
+
+/**
+ * 批量获取队伍评分状态（是否已评分）
+ */
+export async function getTeamRatingStatusBatch(
+  teamIds: number[]
+): Promise<Record<number, boolean>> {
+  return post<Record<number, boolean>>('/api/teams/ratings/status/batch', { teamIds })
+}

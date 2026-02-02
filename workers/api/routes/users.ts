@@ -40,16 +40,34 @@ usersRouter.get('/:id', async (c) => {
 })
 
 // 获取用户发起的队伍
-usersRouter.get('/:id/teams', async (c) => {
+usersRouter.get('/:id/teams', authMiddleware, async (c) => {
   try {
-    const userId = c.req.param('id')
+    const userId = Number(c.req.param('id'))
+    const currentUser = c.get('user')
     const db = drizzle(c.env.DB)
 
     const userTeams = await db.select()
       .from(teams)
-      .where(eq(teams.creator_id, Number(userId)))
+      .where(eq(teams.creator_id, userId))
       .orderBy(desc(teams.created_at))
       .all()
+
+    // 如果查看的是自己的队伍，加入评分状态
+    if (currentUser.id === userId) {
+      const ratingRecords = await db.select({
+        team_id: reviews.team_id
+      })
+        .from(reviews)
+        .where(eq(reviews.reviewer_id, currentUser.id))
+        .all()
+
+      const ratedTeamIds = new Set(ratingRecords.map(r => r.team_id))
+
+      return c.json(userTeams.map(team => ({
+        ...team,
+        hasRated: ratedTeamIds.has(team.id)
+      })))
+    }
 
     return c.json(userTeams)
   } catch (error) {
@@ -59,15 +77,16 @@ usersRouter.get('/:id/teams', async (c) => {
 })
 
 // 获取指定用户加入的队伍
-usersRouter.get('/:id/joined-teams', async (c) => {
+usersRouter.get('/:id/joined-teams', authMiddleware, async (c) => {
   try {
-    const userId = c.req.param('id')
+    const userId = Number(c.req.param('id'))
+    const currentUser = c.get('user')
     const db = drizzle(c.env.DB)
 
     // 获取用户加入的队伍
     const memberRecords = await db.select()
       .from(teamMembers)
-      .where(eq(teamMembers.user_id, Number(userId)))
+      .where(eq(teamMembers.user_id, userId))
       .all()
 
     if (memberRecords.length === 0) {
@@ -81,6 +100,23 @@ usersRouter.get('/:id/joined-teams', async (c) => {
       .where(or(...teamIds.map(id => eq(teams.id, id))))
       .orderBy(desc(teams.created_at))
       .all()
+
+    // 如果查看的是自己的队伍，加入评分状态
+    if (currentUser.id === userId) {
+      const ratingRecords = await db.select({
+        team_id: reviews.team_id
+      })
+        .from(reviews)
+        .where(eq(reviews.reviewer_id, currentUser.id))
+        .all()
+
+      const ratedTeamIds = new Set(ratingRecords.map(r => r.team_id))
+
+      return c.json(joinedTeams.map(team => ({
+        ...team,
+        hasRated: ratedTeamIds.has(team.id)
+      })))
+    }
 
     return c.json(joinedTeams)
   } catch (error) {

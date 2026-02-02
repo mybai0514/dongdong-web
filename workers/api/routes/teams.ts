@@ -4,7 +4,7 @@ import { eq, desc, and } from 'drizzle-orm'
 import { teams, teamMembers, users, reviews } from '../../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { extractToken, validateToken } from '../utils/token'
-import { formatDateUTC8, getNowUTC8, isSameDayUTC8 } from '../utils/time'
+import { getNowUTC8, isSameDayUTC8 } from '../utils/time'
 import type { Bindings } from '../types'
 
 const teamsRouter = new Hono<{ Bindings: Bindings }>()
@@ -734,6 +734,50 @@ teamsRouter.get('/:id/ratings/status', authMiddleware, async (c) => {
   } catch (error) {
     console.error('获取评分状态错误:', error)
     return c.json({ error: '获取评分状态失败' }, 500)
+  }
+})
+
+// 批量获取队伍评分状态
+teamsRouter.post('/ratings/status/batch', authMiddleware, async (c) => {
+  try {
+    const db = drizzle(c.env.DB)
+    const user = c.get('user')
+
+    let body
+    try {
+      body = await c.req.json()
+    } catch (parseError) {
+      console.error('JSON 解析错误:', parseError)
+      return c.json({ error: '请求数据格式错误' }, 400)
+    }
+
+    const { teamIds } = body
+
+    if (!teamIds || !Array.isArray(teamIds) || teamIds.length === 0) {
+      return c.json({ error: '队伍ID列表不能为空' }, 400)
+    }
+
+    // 查询用户对这些队伍的所有评分记录
+    const ratings = await db.select({
+      team_id: reviews.team_id
+    })
+      .from(reviews)
+      .where(eq(reviews.reviewer_id, user.id))
+      .all()
+
+    // 构建已评分的队伍ID集合
+    const ratedTeamIds = new Set(ratings.map(r => r.team_id))
+
+    // 返回每个队伍的评分状态
+    const result: Record<number, boolean> = {}
+    teamIds.forEach((teamId: number) => {
+      result[teamId] = ratedTeamIds.has(teamId)
+    })
+
+    return c.json(result)
+  } catch (error) {
+    console.error('批量获取评分状态错误:', error)
+    return c.json({ error: '批量获取评分状态失败' }, 500)
   }
 })
 

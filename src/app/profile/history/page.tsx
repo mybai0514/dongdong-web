@@ -39,7 +39,6 @@ import {
   getUserJoinedTeams,
   getTeamMembers,
   submitTeamRatings,
-  getTeamRatingStatus,
   getMyTeamRatings,
   getUserReputation,
   ApiError,
@@ -123,8 +122,14 @@ export default function HistoryPage() {
     try {
       const data = await getUserTeams(userId)
       setMyTeams(data)
-      // 检查已完成队伍的评分状态
-      await checkRatingStatus(data)
+      // 从队伍数据中提取已评分的队伍 ID
+      const ratedTeamIds = new Set<number>()
+      data.forEach(team => {
+        if (team.hasRated) {
+          ratedTeamIds.add(team.id)
+        }
+      })
+      setRatedTeams(prev => new Set([...prev, ...ratedTeamIds]))
     } catch (error) {
       console.error('获取我的队伍失败:', error)
     } finally {
@@ -137,8 +142,14 @@ export default function HistoryPage() {
     try {
       const data = await getUserJoinedTeams(userId)
       setJoinedTeams(data)
-      // 检查已完成队伍的评分状态
-      await checkRatingStatus(data)
+      // 从队伍数据中提取已评分的队伍 ID
+      const ratedTeamIds = new Set<number>()
+      data.forEach(team => {
+        if (team.hasRated) {
+          ratedTeamIds.add(team.id)
+        }
+      })
+      setRatedTeams(prev => new Set([...prev, ...ratedTeamIds]))
     } catch (error) {
       console.error('获取加入的队伍失败:', error)
     } finally {
@@ -146,26 +157,6 @@ export default function HistoryPage() {
     }
   }
 
-  // 检查队伍评分状态
-  const checkRatingStatus = async (teams: Team[]) => {
-    const completedTeams = teams.filter(team => isTeamCompleted(team.end_time))
-    const ratedTeamIds = new Set<number>()
-
-    await Promise.all(
-      completedTeams.map(async (team) => {
-        try {
-          const status = await getTeamRatingStatus(team.id)
-          if (status.hasRated) {
-            ratedTeamIds.add(team.id)
-          }
-        } catch (error) {
-          console.error(`检查队伍 ${team.id} 评分状态失败:`, error)
-        }
-      })
-    )
-
-    setRatedTeams(prev => new Set([...prev, ...ratedTeamIds]))
-  }
 
   const showMembers = async (teamId: number, teamTitle: string, teamDescription?: string) => {
     setMembersDialog({
