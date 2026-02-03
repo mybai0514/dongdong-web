@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Pagination,
   PaginationContent,
@@ -16,14 +16,14 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from '@/components/ui/pagination'
+} from '@/components/ui/pagination';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -31,148 +31,165 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { MessageSquare, Eye, ThumbsUp, Clock, Search, Plus, Loader2, Pin, Flame } from 'lucide-react'
-import { formatRelativeTime, getNowInUTC8, toUTC8 } from '@/lib/time'
-import { useUser } from '@/hooks'
-import { Textarea } from '@/components/ui/textarea'
-import { getForumPosts, createForumPost } from '@/lib/api'
-import type { ForumCategory, ForumPost } from '@/types'
+} from '@/components/ui/dialog';
+import {
+  MessageSquare,
+  Eye,
+  ThumbsUp,
+  Clock,
+  Search,
+  Plus,
+  Loader2,
+  Pin,
+  Flame,
+} from 'lucide-react';
+import { formatRelativeTime, getNowInUTC8, toUTC8 } from '@/lib/time';
+import { useUser } from '@/hooks';
+import { Textarea } from '@/components/ui/textarea';
+import { getForumPosts, createForumPost } from '@/lib/api';
+import type { ForumCategory, ForumPost } from '@/types';
 
 export default function CategoryPage() {
-  const params = useParams()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const user = useUser()
-  const categorySlug = params.slug as string
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const user = useUser();
+  const categorySlug = params.slug as string;
 
   // 从 URL 查询参数获取状态
-  const currentPage = parseInt(searchParams.get('page') || '1', 10)
-  const searchQuery = searchParams.get('search') || ''
-  const sortBy = (searchParams.get('sort') || 'latest') as 'latest' | 'views' | 'likes'
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const searchQuery = searchParams.get('search') || '';
+  const sortBy = (searchParams.get('sort') || 'latest') as
+    | 'latest'
+    | 'views'
+    | 'likes';
 
   // 本地状态
-  const [category, setCategory] = useState<ForumCategory | null>(null)
-  const [posts, setPosts] = useState<ForumPost[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totalPages, setTotalPages] = useState(1)
+  const [category, setCategory] = useState<ForumCategory | null>(null);
+  const [posts, setPosts] = useState<ForumPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
 
   // 发帖对话框
-  const [createPostDialog, setCreatePostDialog] = useState(false)
-  const [newPostTitle, setNewPostTitle] = useState('')
-  const [newPostContent, setNewPostContent] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [createPostDialog, setCreatePostDialog] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // 本地搜索输入框状态（用于防止每次输入都调用接口）
-  const [localSearchInput, setLocalSearchInput] = useState(searchQuery)
+  const [localSearchInput, setLocalSearchInput] = useState(searchQuery);
 
-  const itemsPerPage = 12
+  const itemsPerPage = 12;
 
   // 监听分类和查询参数变化，获取数据
   useEffect(() => {
-    fetchPosts()
+    fetchPosts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categorySlug, currentPage, sortBy, searchQuery])
+  }, [categorySlug, currentPage, sortBy, searchQuery]);
 
   const fetchPosts = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const data = await getForumPosts(categorySlug, {
         page: currentPage,
         limit: itemsPerPage,
         sort: sortBy,
-        search: searchQuery || undefined
-      })
+        search: searchQuery || undefined,
+      });
 
-      setPosts(data.posts || [])
-      setCategory(data.category || null)
-      setTotalPages(data.totalPages || 1)
+      setPosts(data.posts || []);
+      setCategory(data.category || null);
+      setTotalPages(data.totalPages || 1);
     } catch (error) {
-      console.error('获取帖子列表失败:', error)
+      console.error('获取帖子列表失败:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // 更新 URL 查询参数的辅助函数
   const updateQueryParams = (newParams: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams)
+    const params = new URLSearchParams(searchParams);
 
     Object.entries(newParams).forEach(([key, value]) => {
       if (value === null || value === '') {
-        params.delete(key)
+        params.delete(key);
       } else {
-        params.set(key, value)
+        params.set(key, value);
       }
-    })
+    });
 
     // 重置到第一页（除非明确指定了 page）
-    if (newParams.page === undefined && !(newParams.search === undefined && newParams.sort === undefined)) {
-      params.set('page', '1')
+    if (
+      newParams.page === undefined &&
+      !(newParams.search === undefined && newParams.sort === undefined)
+    ) {
+      params.set('page', '1');
     }
 
-    router.push(`?${params.toString()}`)
-  }
+    router.push(`?${params.toString()}`);
+  };
 
   // 处理搜索
   const handleSearch = (query: string) => {
-    updateQueryParams({ search: query, page: '1' })
-  }
+    updateQueryParams({ search: query, page: '1' });
+  };
 
   // 处理排序
   const handleSortChange = (newSort: string) => {
-    updateQueryParams({ sort: newSort, page: '1' })
-  }
+    updateQueryParams({ sort: newSort, page: '1' });
+  };
 
   // 处理分页
   const handlePageChange = (page: number) => {
-    updateQueryParams({ page: page.toString() })
-  }
+    updateQueryParams({ page: page.toString() });
+  };
 
   const handleCreatePost = async () => {
     if (!user) {
-      router.push(`/login?redirect=/forum/${categorySlug}`)
-      return
+      router.push(`/login?redirect=/forum/${categorySlug}`);
+      return;
     }
 
     if (!newPostTitle.trim() || !newPostContent.trim()) {
-      toast.warning('标题和内容不能为空')
-      return
+      toast.warning('标题和内容不能为空');
+      return;
     }
 
     if (newPostTitle.length > 200) {
-      toast.warning('标题不能超过200个字符')
-      return
+      toast.warning('标题不能超过200个字符');
+      return;
     }
 
     if (newPostContent.length > 10000) {
-      toast.warning('内容不能超过10000个字符')
-      return
+      toast.warning('内容不能超过10000个字符');
+      return;
     }
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       await createForumPost(categorySlug, {
         title: newPostTitle.trim(),
-        content: newPostContent.trim()
-      })
+        content: newPostContent.trim(),
+      });
 
       // 关闭对话框并重置表单
-      setCreatePostDialog(false)
-      setNewPostTitle('')
-      setNewPostContent('')
+      setCreatePostDialog(false);
+      setNewPostTitle('');
+      setNewPostContent('');
 
       // 重新加载帖子列表
-      await fetchPosts()
-      toast.success('发布成功！')
+      await fetchPosts();
+      toast.success('发布成功！');
     } catch (error) {
-      console.error('发布帖子失败:', error)
-      const errorMessage = error instanceof Error ? error.message : '发布帖子失败'
-      toast.error(errorMessage)
+      console.error('发布帖子失败:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : '发布帖子失败';
+      toast.error(errorMessage);
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const getCategoryColor = (slug: string) => {
     if (slug === 'lusty') {
@@ -181,46 +198,50 @@ export default function CategoryPage() {
         border: 'border-orange-200',
         text: 'text-orange-600',
         badge: 'bg-orange-100 text-orange-700',
-        button: 'bg-orange-500 hover:bg-orange-600'
-      }
+        button: 'bg-orange-500 hover:bg-orange-600',
+      };
     } else if (slug === 'fishy') {
       return {
         bg: 'bg-blue-50',
         border: 'border-blue-200',
         text: 'text-blue-600',
         badge: 'bg-blue-100 text-blue-700',
-        button: 'bg-blue-500 hover:bg-blue-600'
-      }
+        button: 'bg-blue-500 hover:bg-blue-600',
+      };
     }
     return {
       bg: 'bg-gray-50',
       border: 'border-gray-200',
       text: 'text-gray-600',
       badge: 'bg-gray-100 text-gray-700',
-      button: 'bg-gray-500 hover:bg-gray-600'
-    }
-  }
+      button: 'bg-gray-500 hover:bg-gray-600',
+    };
+  };
 
-  const colors = category ? getCategoryColor(category.slug) : getCategoryColor('')
+  const colors = category
+    ? getCategoryColor(category.slug)
+    : getCategoryColor('');
 
   const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + '...'
-  }
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
 
   // 判断是否是新帖（24小时内）
   const isNewPost = (createdAt: string | null) => {
-    if (!createdAt) return false
-    const postTime = toUTC8(createdAt).getTime()
-    const now = getNowInUTC8().getTime()
-    const hoursDiff = (now - postTime) / (1000 * 60 * 60)
-    return hoursDiff <= 24
-  }
+    if (!createdAt) return false;
+    const postTime = toUTC8(createdAt).getTime();
+    const now = getNowInUTC8().getTime();
+    const hoursDiff = (now - postTime) / (1000 * 60 * 60);
+    return hoursDiff <= 24;
+  };
 
   // 判断是否是热帖（浏览数 > 50 或评论数 > 5 或点赞数 > 10）
   const isHotPost = (post: ForumPost) => {
-    return post.views_count > 10 || post.comments_count > 5 || post.likes_count > 10
-  }
+    return (
+      post.views_count > 10 || post.comments_count > 5 || post.likes_count > 10
+    );
+  };
 
   if (loading && !category) {
     return (
@@ -232,7 +253,7 @@ export default function CategoryPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (!category) {
@@ -245,13 +266,15 @@ export default function CategoryPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* 分类标题 */}
-      <div className={`${colors.bg} ${colors.border} border-2 rounded-lg p-6 mb-6`}>
+      <div
+        className={`${colors.bg} ${colors.border} border-2 rounded-lg p-6 mb-6`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`text-5xl ${colors.text}`}>
@@ -259,7 +282,9 @@ export default function CategoryPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold mb-2">{category.name}</h1>
-              <p className="text-muted-foreground">{category.description || '暂无描述'}</p>
+              <p className="text-muted-foreground">
+                {category.description || '暂无描述'}
+              </p>
               <Badge variant="secondary" className={`${colors.badge} mt-2`}>
                 {category.post_count} 个帖子
               </Badge>
@@ -268,10 +293,10 @@ export default function CategoryPage() {
           <Button
             onClick={() => {
               if (!user) {
-                router.push(`/login?redirect=/forum/${categorySlug}`)
-                return
+                router.push(`/login?redirect=/forum/${categorySlug}`);
+                return;
               }
-              setCreatePostDialog(true)
+              setCreatePostDialog(true);
             }}
             className={colors.button}
           >
@@ -291,18 +316,21 @@ export default function CategoryPage() {
             onChange={(e) => setLocalSearchInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                handleSearch(localSearchInput)
+                handleSearch(localSearchInput);
               }
             }}
             onBlur={() => {
               if (localSearchInput !== searchQuery) {
-                handleSearch(localSearchInput)
+                handleSearch(localSearchInput);
               }
             }}
             className="pl-10"
           />
         </div>
-        <Select value={sortBy} onValueChange={(value) => handleSortChange(value)}>
+        <Select
+          value={sortBy}
+          onValueChange={(value) => handleSortChange(value)}
+        >
           <SelectTrigger className="w-full sm:w-45">
             <SelectValue placeholder="排序方式" />
           </SelectTrigger>
@@ -327,13 +355,15 @@ export default function CategoryPage() {
             {searchQuery ? '没有找到匹配的帖子' : '成为第一个发帖的人吧！'}
           </p>
           {!searchQuery && (
-            <Button onClick={() => {
-              if (!user) {
-                router.push(`/login?redirect=/forum/${categorySlug}`)
-                return
-              }
-              setCreatePostDialog(true)
-            }}>
+            <Button
+              onClick={() => {
+                if (!user) {
+                  router.push(`/login?redirect=/forum/${categorySlug}`);
+                  return;
+                }
+                setCreatePostDialog(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               发布帖子
             </Button>
@@ -354,17 +384,23 @@ export default function CategoryPage() {
                       </AvatarFallback>
                     </Avatar>
 
-                    {/* 中间内容 */}
-                    <div className="flex-1 min-w-0">
+                    {/* 主要内容区域 */}
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      {/* 标题行 */}
                       <div className="flex items-center gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           {post.is_pinned && (
                             <Pin className="h-4 w-4 text-orange-500 shrink-0" />
                           )}
-                          <h3 className="font-semibold text-base truncate">{post.title}</h3>
+                          <h3 className="font-semibold text-base truncate">
+                            {post.title}
+                          </h3>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isNewPost(post.created_at) && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1 py-0 h-4 shrink-0 font-medium">
+                              <Badge
+                                variant="secondary"
+                                className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1 py-0 h-4 shrink-0 font-medium"
+                              >
                                 NEW
                               </Badge>
                             )}
@@ -374,33 +410,48 @@ export default function CategoryPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* 内容预览 */}
                       <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
                         {truncateText(post.content, 100)}
                       </p>
-                      <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                        <span className="font-medium">{post.author_username}</span>
-                        <span className="text-muted-foreground/50">•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {post.created_at ? formatRelativeTime(post.created_at) : '-'}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* 右侧统计数据 */}
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="flex flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <Eye className="h-3.5 w-3.5 text-blue-500" />
-                          <span className="font-medium text-foreground min-w-8 text-right">{post.views_count}</span>
+                      {/* 底部信息区域 */}
+                      <div className="flex items-center justify-between gap-4 mt-auto">
+                        {/* 左侧:作者和时间 */}
+                        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                          <span className="font-medium">
+                            {post.author_username}
+                          </span>
+                          <span className="text-muted-foreground/50">•</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {post.created_at
+                              ? formatRelativeTime(post.created_at)
+                              : '-'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <MessageSquare className="h-3.5 w-3.5 text-green-500" />
-                          <span className="font-medium text-foreground min-w-8 text-right">{post.comments_count}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <ThumbsUp className="h-3.5 w-3.5 text-red-500" />
-                          <span className="font-medium text-foreground min-w-8 text-right">{post.likes_count}</span>
+
+                        {/* 右侧:统计数据 - 横向排列 */}
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <Eye className="h-3.5 w-3.5 text-blue-500" />
+                            <span className="font-medium text-foreground">
+                              {post.views_count}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+                            <span className="font-medium text-foreground">
+                              {post.comments_count}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <ThumbsUp className="h-3.5 w-3.5 text-red-500" />
+                            <span className="font-medium text-foreground">
+                              {post.likes_count}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -418,15 +469,19 @@ export default function CategoryPage() {
                   <PaginationPrevious
                     onClick={() => {
                       if (currentPage > 1) {
-                        handlePageChange(currentPage - 1)
+                        handlePageChange(currentPage - 1);
                       }
                     }}
-                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    className={
+                      currentPage === 1
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
                   />
                 </PaginationItem>
 
                 {[...Array(totalPages)].map((_, i) => {
-                  const page = i + 1
+                  const page = i + 1;
                   if (
                     page === 1 ||
                     page === totalPages ||
@@ -442,25 +497,32 @@ export default function CategoryPage() {
                           {page}
                         </PaginationLink>
                       </PaginationItem>
-                    )
-                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    );
+                  } else if (
+                    page === currentPage - 2 ||
+                    page === currentPage + 2
+                  ) {
                     return (
                       <PaginationItem key={page}>
                         <PaginationEllipsis />
                       </PaginationItem>
-                    )
+                    );
                   }
-                  return null
+                  return null;
                 })}
 
                 <PaginationItem>
                   <PaginationNext
                     onClick={() => {
                       if (currentPage < totalPages) {
-                        handlePageChange(currentPage + 1)
+                        handlePageChange(currentPage + 1);
                       }
                     }}
-                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    className={
+                      currentPage === totalPages
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>
@@ -506,7 +568,11 @@ export default function CategoryPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreatePostDialog(false)} disabled={submitting}>
+            <Button
+              variant="outline"
+              onClick={() => setCreatePostDialog(false)}
+              disabled={submitting}
+            >
               取消
             </Button>
             <Button onClick={handleCreatePost} disabled={submitting}>
@@ -523,5 +589,5 @@ export default function CategoryPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
