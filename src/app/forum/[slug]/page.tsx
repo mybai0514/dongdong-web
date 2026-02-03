@@ -36,6 +36,7 @@ import {
   MessageSquare,
   Eye,
   ThumbsUp,
+  ThumbsDown,
   Clock,
   Search,
   Plus,
@@ -450,6 +451,12 @@ export default function CategoryPage() {
                             <ThumbsUp className="h-3.5 w-3.5 text-red-500" />
                             <span className="font-medium text-foreground">
                               {post.likes_count}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <ThumbsDown className="h-3.5 w-3.5 text-gray-500" />
+                            <span className="font-medium text-foreground">
+                              {post.dislikes_count}
                             </span>
                           </div>
                         </div>

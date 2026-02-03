@@ -74,8 +74,12 @@ export {
   createForumPost,
   likeForumPost,
   unlikeForumPost,
+  dislikeForumPost,
+  undislikeForumPost,
   getForumComments,
   createForumComment,
   likeForumComment,
   unlikeForumComment,
+  dislikeForumComment,
+  undislikeForumComment,
 } from './forum'

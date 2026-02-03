@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   Eye,
   ThumbsUp,
+  ThumbsDown,
   MessageSquare,
   Clock,
   Loader2,
@@ -20,7 +21,7 @@ import {
 } from 'lucide-react'
 import { formatTimeForDisplay } from '@/lib/time'
 import { useUser } from '@/hooks'
-import { getForumPost, likeForumPost, unlikeForumPost } from '@/lib/api'
+import { getForumPost, likeForumPost, unlikeForumPost, dislikeForumPost, undislikeForumPost } from '@/lib/api'
 import type { ForumPost } from '@/types'
 
 export default function PostDetailPage() {
@@ -33,6 +34,7 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<ForumPost | null>(null)
   const [loading, setLoading] = useState(true)
   const [likePending, setLikePending] = useState(false)
+  const [dislikePending, setDislikePending] = useState(false)
   // const lastFetchedPostId = useRef<number | null>(null)
 
   useEffect(() => {
@@ -77,6 +79,31 @@ export default function PostDetailPage() {
       toast.error('操作失败，请重试')
     } finally {
       setLikePending(false)
+    }
+  }
+
+  const handleDislike = async () => {
+    if (!user) {
+      router.push(`/login?redirect=/forum/${categorySlug}/${postId}`)
+      return
+    }
+
+    if (dislikePending) return
+
+    setDislikePending(true)
+    try {
+      if (post?.isDisliked) {
+        const data = await undislikeForumPost(postId)
+        setPost(prev => prev ? { ...prev, isDisliked: false, dislikes_count: data.dislikes_count } : null)
+      } else {
+        const data = await dislikeForumPost(postId)
+        setPost(prev => prev ? { ...prev, isDisliked: true, dislikes_count: data.dislikes_count } : null)
+      }
+    } catch (error) {
+      console.error('反赞操作失败:', error)
+      toast.error('操作失败，请重试')
+    } finally {
+      setDislikePending(false)
     }
   }
 
@@ -179,6 +206,10 @@ export default function PostDetailPage() {
                   <ThumbsUp className="h-4 w-4" />
                   {post.likes_count}
                 </span>
+                <span className="flex items-center gap-1">
+                  <ThumbsDown className="h-4 w-4" />
+                  {post.dislikes_count}
+                </span>
               </div>
             </div>
           </div>
@@ -194,14 +225,14 @@ export default function PostDetailPage() {
             </div>
           </div>
 
-          {/* 点赞按钮 */}
-          <div className="mt-8 pt-6 border-t">
+          {/* 点赞和反赞按钮 */}
+          <div className="mt-8 pt-6 border-t flex gap-3">
             <Button
               variant={post.isLiked ? "default" : "outline"}
               size="lg"
               onClick={handleLike}
               disabled={likePending}
-              className="w-full sm:w-auto"
+              className="flex-1 sm:flex-none"
             >
               {likePending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -209,6 +240,20 @@ export default function PostDetailPage() {
                 <ThumbsUp className={`h-4 w-4 mr-2 ${post.isLiked ? 'fill-current' : ''}`} />
               )}
               {post.isLiked ? '已点赞' : '点赞'} ({post.likes_count})
+            </Button>
+            <Button
+              variant={post.isDisliked ? "destructive" : "outline"}
+              size="lg"
+              onClick={handleDislike}
+              disabled={dislikePending}
+              className="flex-1 sm:flex-none"
+            >
+              {dislikePending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ThumbsDown className={`h-4 w-4 mr-2 ${post.isDisliked ? 'fill-current' : ''}`} />
+              )}
+              {post.isDisliked ? '已反赞' : '反赞'} ({post.dislikes_count})
             </Button>
           </div>
         </CardContent>

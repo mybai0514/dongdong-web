@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq, desc, and, inArray } from 'drizzle-orm'
-import { forumCategories, forumPosts, forumComments, forumLikes, users } from '../../../db/schema'
+import { forumCategories, forumPosts, forumComments, forumLikes, forumDislikes, users } from '../../../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { extractToken, validateToken } from '../utils/token'
 import type { Bindings } from '../types'
@@ -80,6 +80,7 @@ forumRouter.get('/:categorySlug/posts', async (c) => {
       views_count: forumPosts.views_count,
       comments_count: forumPosts.comments_count,
       likes_count: forumPosts.likes_count,
+      dislikes_count: forumPosts.dislikes_count,
       is_pinned: forumPosts.is_pinned,
       status: forumPosts.status,
       created_at: forumPosts.created_at,
@@ -128,7 +129,7 @@ forumRouter.get('/:categorySlug/posts', async (c) => {
     const endIndex = startIndex + limit
     const paginatedPosts = allPosts.slice(startIndex, endIndex)
 
-    // 如果用户已登录，查询点赞状态
+    // 如果用户已登录，查询点赞和反赞状态
     let postsWithLikeStatus = paginatedPosts
     if (token) {
       const user = await validateToken(db, token)
@@ -142,11 +143,21 @@ forumRouter.get('/:categorySlug/posts', async (c) => {
           ))
           .all()
 
+        const dislikes = await db.select()
+          .from(forumDislikes)
+          .where(and(
+            eq(forumDislikes.user_id, user.id),
+            inArray(forumDislikes.post_id, postIds)
+          ))
+          .all()
+
         const likedPostIds = new Set(likes.map(l => l.post_id).filter(Boolean))
+        const dislikedPostIds = new Set(dislikes.map(d => d.post_id).filter(Boolean))
 
         postsWithLikeStatus = paginatedPosts.map(post => ({
           ...post,
           isLiked: likedPostIds.has(post.id),
+          isDisliked: dislikedPostIds.has(post.id),
           isAuthor: post.author_id === user.id
         }))
       }
@@ -183,6 +194,7 @@ forumRouter.get('/posts/:postId', async (c) => {
       views_count: forumPosts.views_count,
       comments_count: forumPosts.comments_count,
       likes_count: forumPosts.likes_count,
+      dislikes_count: forumPosts.dislikes_count,
       is_pinned: forumPosts.is_pinned,
       status: forumPosts.status,
       created_at: forumPosts.created_at,
@@ -208,7 +220,7 @@ forumRouter.get('/posts/:postId', async (c) => {
       .where(eq(forumPosts.id, postId))
       .run()
 
-    // 如果用户已登录，查询点赞状态
+    // 如果用户已登录，查询点赞和反赞状态
     let postWithStatus: any = { ...post, views_count: (post.views_count || 0) + 1 }
     if (token) {
       const user = await validateToken(db, token)
@@ -221,9 +233,18 @@ forumRouter.get('/posts/:postId', async (c) => {
           ))
           .get()
 
+        const dislike = await db.select()
+          .from(forumDislikes)
+          .where(and(
+            eq(forumDislikes.user_id, user.id),
+            eq(forumDislikes.post_id, postId)
+          ))
+          .get()
+
         postWithStatus = {
           ...postWithStatus,
           isLiked: !!like,
+          isDisliked: !!dislike,
           isAuthor: post.author_id === user.id
         }
       }
@@ -398,6 +419,224 @@ forumRouter.delete('/posts/:postId/like', authMiddleware, async (c) => {
   } catch (error) {
     console.error('取消点赞错误:', error)
     return c.json({ error: '取消点赞失败' }, 500)
+  }
+})
+
+// ==================== 反赞相关 ====================
+
+// 反赞帖子（需认证）
+forumRouter.post('/posts/:postId/dislike', authMiddleware, async (c) => {
+  try {
+    const postId = parseInt(c.req.param('postId'))
+    const user = c.get('user')
+    const db = drizzle(c.env.DB)
+
+    // 检查帖子是否存在
+    const post = await db.select()
+      .from(forumPosts)
+      .where(eq(forumPosts.id, postId))
+      .get()
+
+    if (!post) {
+      return c.json({ error: '帖子不存在' }, 404)
+    }
+
+    // 检查是否已反赞
+    const existingDislike = await db.select()
+      .from(forumDislikes)
+      .where(and(
+        eq(forumDislikes.user_id, user.id),
+        eq(forumDislikes.post_id, postId)
+      ))
+      .get()
+
+    if (existingDislike) {
+      return c.json({ error: '已经反赞过了' }, 400)
+    }
+
+    // 添加反赞记录
+    await db.insert(forumDislikes).values({
+      user_id: user.id,
+      post_id: postId,
+      comment_id: null,
+      created_at: new Date()
+    }).run()
+
+    // 更新帖子反赞数
+    await db.update(forumPosts)
+      .set({ dislikes_count: post.dislikes_count + 1 })
+      .where(eq(forumPosts.id, postId))
+      .run()
+
+    return c.json({
+      success: true,
+      dislikes_count: post.dislikes_count + 1
+    })
+  } catch (error) {
+    console.error('反赞帖子错误:', error)
+    return c.json({ error: '反赞失败' }, 500)
+  }
+})
+
+// 取消反赞帖子（需认证）
+forumRouter.delete('/posts/:postId/dislike', authMiddleware, async (c) => {
+  try {
+    const postId = parseInt(c.req.param('postId'))
+    const user = c.get('user')
+    const db = drizzle(c.env.DB)
+
+    // 检查帖子是否存在
+    const post = await db.select()
+      .from(forumPosts)
+      .where(eq(forumPosts.id, postId))
+      .get()
+
+    if (!post) {
+      return c.json({ error: '帖子不存在' }, 404)
+    }
+
+    // 检查是否已反赞
+    const existingDislike = await db.select()
+      .from(forumDislikes)
+      .where(and(
+        eq(forumDislikes.user_id, user.id),
+        eq(forumDislikes.post_id, postId)
+      ))
+      .get()
+
+    if (!existingDislike) {
+      return c.json({ error: '还未反赞' }, 400)
+    }
+
+    // 删除反赞记录
+    await db.delete(forumDislikes)
+      .where(and(
+        eq(forumDislikes.user_id, user.id),
+        eq(forumDislikes.post_id, postId)
+      ))
+      .run()
+
+    // 更新帖子反赞数
+    await db.update(forumPosts)
+      .set({ dislikes_count: Math.max(0, post.dislikes_count - 1) })
+      .where(eq(forumPosts.id, postId))
+      .run()
+
+    return c.json({
+      success: true,
+      dislikes_count: Math.max(0, post.dislikes_count - 1)
+    })
+  } catch (error) {
+    console.error('取消反赞错误:', error)
+    return c.json({ error: '取消反赞失败' }, 500)
+  }
+})
+
+// 反赞评论（需认证）
+forumRouter.post('/comments/:commentId/dislike', authMiddleware, async (c) => {
+  try {
+    const commentId = parseInt(c.req.param('commentId'))
+    const user = c.get('user')
+    const db = drizzle(c.env.DB)
+
+    // 检查评论是否存在
+    const comment = await db.select()
+      .from(forumComments)
+      .where(eq(forumComments.id, commentId))
+      .get()
+
+    if (!comment) {
+      return c.json({ error: '评论不存在' }, 404)
+    }
+
+    // 检查是否已反赞
+    const existingDislike = await db.select()
+      .from(forumDislikes)
+      .where(and(
+        eq(forumDislikes.user_id, user.id),
+        eq(forumDislikes.comment_id, commentId)
+      ))
+      .get()
+
+    if (existingDislike) {
+      return c.json({ error: '已经反赞过了' }, 400)
+    }
+
+    // 添加反赞记录
+    await db.insert(forumDislikes).values({
+      user_id: user.id,
+      post_id: null,
+      comment_id: commentId,
+      created_at: new Date()
+    }).run()
+
+    // 更新评论反赞数
+    await db.update(forumComments)
+      .set({ dislikes_count: comment.dislikes_count + 1 })
+      .where(eq(forumComments.id, commentId))
+      .run()
+
+    return c.json({
+      success: true,
+      dislikes_count: comment.dislikes_count + 1
+    })
+  } catch (error) {
+    console.error('反赞评论错误:', error)
+    return c.json({ error: '反赞失败' }, 500)
+  }
+})
+
+// 取消反赞评论（需认证）
+forumRouter.delete('/comments/:commentId/dislike', authMiddleware, async (c) => {
+  try {
+    const commentId = parseInt(c.req.param('commentId'))
+    const user = c.get('user')
+    const db = drizzle(c.env.DB)
+
+    // 检查评论是否存在
+    const comment = await db.select()
+      .from(forumComments)
+      .where(eq(forumComments.id, commentId))
+      .get()
+
+    if (!comment) {
+      return c.json({ error: '评论不存在' }, 404)
+    }
+
+    // 检查是否已反赞
+    const existingDislike = await db.select()
+      .from(forumDislikes)
+      .where(and(
+        eq(forumDislikes.user_id, user.id),
+        eq(forumDislikes.comment_id, commentId)
+      ))
+      .get()
+
+    if (!existingDislike) {
+      return c.json({ error: '还未反赞' }, 400)
+    }
+
+    // 删除反赞记录
+    await db.delete(forumDislikes)
+      .where(and(
+        eq(forumDislikes.user_id, user.id),
+        eq(forumDislikes.comment_id, commentId)
+      ))
+      .run()
+
+    // 更新评论反赞数
+    await db.update(forumComments)
+      .set({ dislikes_count: Math.max(0, comment.dislikes_count - 1) })
+      .where(eq(forumComments.id, commentId))
+      .run()
+
+    return c.json({
+      success: true,
+      dislikes_count: Math.max(0, comment.dislikes_count - 1)
+    })
+  } catch (error) {
+    console.error('取消反赞评论错误:', error)
+    return c.json({ error: '取消反赞失败' }, 500)
   }
 })
 

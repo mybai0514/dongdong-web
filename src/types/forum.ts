@@ -27,6 +27,7 @@ export interface ForumPost {
   views_count: number
   comments_count: number
   likes_count: number
+  dislikes_count: number
   is_pinned: boolean
   status: PostStatus
   created_at: string | null
@@ -38,6 +39,7 @@ export interface ForumPost {
   category_slug?: string
   // 用户状态
   isLiked?: boolean
+  isDisliked?: boolean
   isAuthor?: boolean
 }
 
@@ -68,6 +70,7 @@ export interface ForumComment {
   parent_comment_id: number | null
   content: string
   likes_count: number
+  dislikes_count: number
   status: CommentStatus
   created_at: string | null
   updated_at: string | null
@@ -76,6 +79,7 @@ export interface ForumComment {
   author_avatar?: string | null
   // 用户状态
   isLiked?: boolean
+  isDisliked?: boolean
   isAuthor?: boolean
   // 子评论
   replies?: ForumComment[]
@@ -91,4 +95,10 @@ export interface CreateCommentFormData {
 export interface LikeResponse {
   success: boolean
   likes_count: number
+}
+
+// 反赞响应
+export interface DislikeResponse {
+  success: boolean
+  dislikes_count: number
 }

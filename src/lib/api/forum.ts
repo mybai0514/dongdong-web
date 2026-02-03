@@ -11,6 +11,7 @@ import type {
   ForumComment,
   CreateCommentFormData,
   LikeResponse,
+  DislikeResponse,
 } from '@/types'
 
 /**
@@ -117,4 +118,32 @@ export async function likeForumComment(commentId: number): Promise<LikeResponse>
  */
 export async function unlikeForumComment(commentId: number): Promise<LikeResponse> {
   return del<LikeResponse>(`/api/forum/comments/${commentId}/like`)
+}
+
+/**
+ * 反赞帖子（需认证）
+ */
+export async function dislikeForumPost(postId: number): Promise<DislikeResponse> {
+  return post<DislikeResponse>(`/api/forum/posts/${postId}/dislike`)
+}
+
+/**
+ * 取消反赞帖子（需认证）
+ */
+export async function undislikeForumPost(postId: number): Promise<DislikeResponse> {
+  return del<DislikeResponse>(`/api/forum/posts/${postId}/dislike`)
+}
+
+/**
+ * 反赞评论（需认证）
+ */
+export async function dislikeForumComment(commentId: number): Promise<DislikeResponse> {
+  return post<DislikeResponse>(`/api/forum/comments/${commentId}/dislike`)
+}
+
+/**
+ * 取消反赞评论（需认证）
+ */
+export async function undislikeForumComment(commentId: number): Promise<DislikeResponse> {
+  return del<DislikeResponse>(`/api/forum/comments/${commentId}/dislike`)
 }

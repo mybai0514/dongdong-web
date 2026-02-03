@@ -97,6 +97,7 @@ export const forumPosts = sqliteTable('forum_posts', {
   views_count: integer('views_count').notNull().default(0), // 浏览次数
   comments_count: integer('comments_count').notNull().default(0), // 评论数缓存
   likes_count: integer('likes_count').notNull().default(0), // 点赞数缓存
+  dislikes_count: integer('dislikes_count').notNull().default(0), // 反赞数缓存
   is_pinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false), // 是否置顶
   status: text('status').notNull().default('published'), // published/draft/deleted
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -111,6 +112,7 @@ export const forumComments = sqliteTable('forum_comments', {
   parent_comment_id: integer('parent_comment_id'), // 父评论 ID（楼中楼），自引用
   content: text('content').notNull(), // 评论内容
   likes_count: integer('likes_count').notNull().default(0), // 点赞数
+  dislikes_count: integer('dislikes_count').notNull().default(0), // 反赞数
   status: text('status').notNull().default('published'), // published/deleted
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
@@ -122,5 +124,14 @@ export const forumLikes = sqliteTable('forum_likes', {
   user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   post_id: integer('post_id').references(() => forumPosts.id, { onDelete: 'cascade' }), // NULL 表示点赞的是评论
   comment_id: integer('comment_id').references(() => forumComments.id, { onDelete: 'cascade' }), // NULL 表示点赞的是帖子
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
+})
+
+// ==================== 论坛反赞表 ====================
+export const forumDislikes = sqliteTable('forum_dislikes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  post_id: integer('post_id').references(() => forumPosts.id, { onDelete: 'cascade' }), // NULL 表示反赞的是评论
+  comment_id: integer('comment_id').references(() => forumComments.id, { onDelete: 'cascade' }), // NULL 表示反赞的是帖子
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date())
 })
