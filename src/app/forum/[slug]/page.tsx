@@ -159,12 +159,6 @@ export default function CategoryPage() {
       return;
     }
 
-    // 检查图片数量限制
-    if (selectedFiles.length >= MAX_IMAGES) {
-      toast.warning(`最多只能上传${MAX_IMAGES}张图片`);
-      return;
-    }
-
     // 验证文件大小（5MB）
     if (file.size > 5 * 1024 * 1024) {
       toast.warning('文件过大，最大支持 5MB');
@@ -177,8 +171,14 @@ export default function CategoryPage() {
       return;
     }
 
-    // 只保存到本地状态，不立即上传
-    setSelectedFiles([...selectedFiles, file]);
+    // 使用函数式更新，避免状态竞争
+    setSelectedFiles(prev => {
+      // 检查图片数量限制
+      if (prev.length >= MAX_IMAGES) {
+        return prev;
+      }
+      return [...prev, file];
+    });
   };
 
   const handleRemoveImage = (index: number) => {
