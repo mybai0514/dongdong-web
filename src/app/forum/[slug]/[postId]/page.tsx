@@ -257,7 +257,7 @@ export default function PostDetailPage() {
                 {images.map((image: string, index: number) => (
                   <div
                     key={index}
-                    className="relative group rounded-lg overflow-hidden border border-muted-foreground/20 cursor-pointer hover:border-primary transition-colors"
+                    className="relative group rounded-lg overflow-hidden border border-muted-foreground/20 cursor-pointer transition-colors"
                     onClick={() => handleImageClick(index)}
                   >
                     <img
