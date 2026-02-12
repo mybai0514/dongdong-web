@@ -314,7 +314,7 @@ export default function PostDetailPage() {
 
       {/* 图片预览 */}
       {imagePreviewOpen && createPortal(
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center"
+        <div className="fixed inset-0 z-100 bg-black/80 flex items-center justify-center"
           onClick={() => setImagePreviewOpen(false)}
         >
           {/* 左上角图片计数 */}
