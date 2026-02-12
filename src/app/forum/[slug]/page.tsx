@@ -241,6 +241,13 @@ export default function CategoryPage() {
       const errorMessage =
         error instanceof Error ? error.message : '发布帖子失败';
       toast.error(errorMessage);
+
+      // 如果是认证错误，跳转到登录页面
+      if (errorMessage.includes('登录已过期') || errorMessage.includes('请先登录')) {
+        setTimeout(() => {
+          router.push(`/login?redirect=/forum/${categorySlug}`);
+        }, 1500);
+      }
     } finally {
       setSubmitting(false);
       setIsUploading(false);

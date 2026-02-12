@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   Eye,
@@ -17,7 +18,11 @@ import {
   MessageSquare,
   Clock,
   Loader2,
-  Pin
+  Pin,
+  ZoomIn,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { formatTimeForDisplay } from '@/lib/time'
 import { useUser } from '@/hooks'
@@ -35,6 +40,9 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true)
   const [likePending, setLikePending] = useState(false)
   const [dislikePending, setDislikePending] = useState(false)
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [images, setImages] = useState<string[]>([])
   // const lastFetchedPostId = useRef<number | null>(null)
 
   useEffect(() => {
@@ -50,11 +58,28 @@ export default function PostDetailPage() {
     try {
       const data = await getForumPost(postId)
       setPost(data.post)
+
+      // 解析图片数据
+      if (data.post.images) {
+        try {
+          const parsedImages = JSON.parse(data.post.images)
+          if (Array.isArray(parsedImages)) {
+            setImages(parsedImages)
+          }
+        } catch (e) {
+          console.error('解析图片数据失败:', e)
+        }
+      }
     } catch (error) {
       console.error('获取帖子详情失败:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleImageClick = (index: number) => {
+    setCurrentImageIndex(index)
+    setImagePreviewOpen(true)
   }
 
   const handleLike = async () => {
@@ -226,32 +251,37 @@ export default function PostDetailPage() {
           </div>
 
           {/* 帖子图片 */}
-          {post.images && (() => {
-            try {
-              const images = JSON.parse(post.images);
-              if (Array.isArray(images) && images.length > 0) {
-                return (
-                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {images.map((image: string, index: number) => (
-                      <div key={index} className="rounded-lg overflow-hidden border">
-                        <img
-                          src={image}
-                          alt={`图片 ${index + 1}`}
-                          className="w-full h-auto object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ))}
+          {images.length > 0 && (
+            <div className="mt-6">
+              <div className={`grid gap-3 ${
+                images.length === 1 ? 'grid-cols-1' :
+                images.length === 2 ? 'grid-cols-2' :
+                images.length === 3 ? 'grid-cols-3' :
+                'grid-cols-2 sm:grid-cols-3'
+              }`}>
+                {images.map((image: string, index: number) => (
+                  <div
+                    key={index}
+                    className="relative group rounded-lg overflow-hidden border border-muted-foreground/20 cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => handleImageClick(index)}
+                  >
+                    <img
+                      src={image}
+                      alt={`图片 ${index + 1}`}
+                      className="w-full h-auto object-cover aspect-video"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    {/* 放大镜图标 */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                      <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   </div>
-                );
-              }
-            } catch (e) {
-              console.error('解析图片数据失败:', e);
-            }
-            return null;
-          })()}
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 点赞和反赞按钮 */}
           <div className="mt-8 pt-6 border-t flex gap-3">
@@ -286,6 +316,82 @@ export default function PostDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 图片预览 */}
+      {imagePreviewOpen && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center"
+          onClick={() => setImagePreviewOpen(false)}
+        >
+          {/* 左上角图片计数 */}
+          <div className="absolute top-4 left-4 text-white text-base font-medium z-10">
+            {currentImageIndex + 1} / {images.length}
+          </div>
+
+          {/* 右上角关闭按钮 */}
+          <button
+            onClick={() => setImagePreviewOpen(false)}
+            className="absolute top-3 right-3 z-10 w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+
+          {/* 图片 */}
+          <img
+            src={images[currentImageIndex]}
+            alt={`图片 ${currentImageIndex + 1}`}
+            className="max-w-full max-h-full object-contain select-none"
+            onClick={(e) => e.stopPropagation()}
+            draggable={false}
+          />
+
+          {/* 左切换按钮 */}
+          {images.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
+              }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 text-white transition-colors"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+
+          {/* 右切换按钮 */}
+          {images.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setCurrentImageIndex((prev) => (prev + 1) % images.length)
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 text-white transition-colors"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+
+          {/* 底部圆点指示器 */}
+          {images.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+              {images.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCurrentImageIndex(index)
+                  }}
+                  className={`h-2 rounded-full transition-all ${
+                    index === currentImageIndex
+                      ? 'bg-white w-5'
+                      : 'bg-white/40 hover:bg-white/60 w-2'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
 
       {/* 评论区域 - 暂时显示占位符 */}
       <Card>

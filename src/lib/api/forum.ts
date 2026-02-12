@@ -152,6 +152,12 @@ export async function undislikeForumComment(commentId: number): Promise<DislikeR
  * 上传图片到 R2
  */
 export async function uploadImage(file: File): Promise<{ url: string; filename: string }> {
+  const token = getToken()
+
+  if (!token) {
+    throw new Error('请先登录')
+  }
+
   const formData = new FormData()
   formData.append('file', file)
 
@@ -162,13 +168,24 @@ export async function uploadImage(file: File): Promise<{ url: string; filename: 
   const response = await fetch(`${apiBaseUrl}/api/upload/image`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${getToken()}`,
+      'Authorization': `Bearer ${token}`,
     },
     body: formData,
   })
 
   if (!response.ok) {
     const error = await response.json() as { error?: string }
+
+    // 如果是认证错误，清除本地存储的认证信息
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.dispatchEvent(new Event('user-logout'))
+      }
+      throw new Error('登录已过期，请重新登录')
+    }
+
     throw new Error(error.error || '上传失败')
   }
 
@@ -180,6 +197,12 @@ export async function uploadImage(file: File): Promise<{ url: string; filename: 
  * 删除上传的图片
  */
 export async function deleteImage(filename: string): Promise<void> {
+  const token = getToken()
+
+  if (!token) {
+    throw new Error('请先登录')
+  }
+
   const apiBaseUrl = typeof window !== 'undefined'
     ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
     : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'
@@ -188,12 +211,23 @@ export async function deleteImage(filename: string): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/api/upload/image/${filename}`, {
     method: 'DELETE',
     headers: {
-      'Authorization': `Bearer ${getToken()}`,
+      'Authorization': `Bearer ${token}`,
     },
   })
 
   if (!response.ok) {
     const error = await response.json() as { error?: string }
+
+    // 如果是认证错误，清除本地存储的认证信息
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.dispatchEvent(new Event('user-logout'))
+      }
+      throw new Error('登录已过期，请重新登录')
+    }
+
     throw new Error(error.error || '删除失败')
   }
 }
