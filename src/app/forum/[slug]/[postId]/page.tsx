@@ -253,12 +253,7 @@ export default function PostDetailPage() {
           {/* 帖子图片 */}
           {images.length > 0 && (
             <div className="mt-6">
-              <div className={`grid gap-3 ${
-                images.length === 1 ? 'grid-cols-1' :
-                images.length === 2 ? 'grid-cols-2' :
-                images.length === 3 ? 'grid-cols-3' :
-                'grid-cols-2 sm:grid-cols-3'
-              }`}>
+              <div className="grid grid-cols-5 gap-3">
                 {images.map((image: string, index: number) => (
                   <div
                     key={index}
@@ -268,7 +263,7 @@ export default function PostDetailPage() {
                     <img
                       src={image}
                       alt={`图片 ${index + 1}`}
-                      className="w-full h-auto object-cover aspect-video"
+                      className="w-full h-full object-cover aspect-square"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}
